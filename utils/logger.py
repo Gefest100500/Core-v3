@@ -2,16 +2,10 @@
 """
 Логирование Core V3.0.
 
-Логи пишутся в %LOCALAPPDATA%/Core/Logs/core.log
+Логи пишутся в <папка программы>/Logs/core.log
 - Ротация: 2 МБ × 5 файлов
 - Буфер сбрасывается после каждой записи (видны в реальном времени)
 - Дублирование в консоль с уровнем INFO
-
-Почему %LOCALAPPDATA%:
-- Всегда есть права на запись (в отличие от папки с .exe)
-- Не засоряет папку проекта
-- Стандартное место для пользовательских данных на Windows
-- Fallback: если LOCALAPPDATA недоступна — пишем рядом с проектом
 """
 import logging
 import os
@@ -24,22 +18,7 @@ from pathlib import Path
 # ПУТЬ К ЛОГАМ
 # =========================================================
 def _get_logs_dir() -> str:
-    """Возвращает папку для логов.
-
-    Приоритет:
-    1. %LOCALAPPDATA%/Core/Logs — стандартное место
-    2. <папка проекта>/Logs — fallback, если LOCALAPPDATA недоступна
-    """
-    try:
-        local_appdata = os.environ.get("LOCALAPPDATA")
-        if local_appdata and os.path.isdir(local_appdata):
-            path = os.path.join(local_appdata, "Core", "Logs")
-            os.makedirs(path, exist_ok=True)
-            return path
-    except (OSError, PermissionError):
-        pass
-
-    # Fallback: рядом с проектом
+    """Возвращает папку для логов строго в папке программы."""
     if getattr(sys, "frozen", False):
         base = Path(sys.executable).resolve().parent
     else:
@@ -61,11 +40,7 @@ LOG_FILE = os.path.join(LOG_DIR, "core.log")
 # HANDLER С FLUSH
 # =========================================================
 class FlushRotatingFileHandler(RotatingFileHandler):
-    """RotatingFileHandler, который сбрасывает буфер после каждой записи.
-
-    Без этого логи в файле могут «залипать» — особенно на Windows,
-    где буферизация агрессивная.
-    """
+    """RotatingFileHandler, который сбрасывает буфер после каждой записи."""
 
     def emit(self, record):
         super().emit(record)
@@ -97,8 +72,6 @@ if not logger.handlers:
         ))
         logger.addHandler(handler)
     except (OSError, PermissionError):
-        # Если не удалось создать файл — работаем без файлового handler'а.
-        # Консоль всё равно останется.
         pass
 
     # Дублируем в консоль

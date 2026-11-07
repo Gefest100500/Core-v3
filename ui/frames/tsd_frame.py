@@ -5,9 +5,11 @@ import os
 import re
 import qrcode
 
-from PyQt6.QtCore import Qt, QSize, QStringListModel
+from PyQt6.QtCore import Qt, QSize, QStringListModel, QTimer
 from PyQt6.QtGui import QPixmap, QImage
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QCompleter
+from PyQt6.QtWidgets import (
+    QVBoxLayout, QHBoxLayout, QLabel, QCompleter
+)
 
 from ui.frames.base_frame import BaseFrame
 from ui.components.widgets import (
@@ -15,7 +17,7 @@ from ui.components.widgets import (
     AnimatedPlaceholderEntry, style_popup,
 )
 from ui.icons import get_icon_simple
-from utils.file_utils import get_data_dir
+from utils.file_utils import get_base_dir
 from utils.logger import log
 
 
@@ -34,7 +36,7 @@ class TsdFrame(BaseFrame):
     # ЗАГРУЗКА ДАННЫХ
     # =========================================================
     def _load_gm_ip(self) -> dict:
-        path = os.path.join(get_data_dir(), "gm_ip.json")
+        path = os.path.join(get_base_dir(), "data", "gm_ip.json")
         if not os.path.exists(path):
             log.warning(f"TsdFrame: gm_ip.json не найден: {path}")
             return {}
@@ -48,12 +50,14 @@ class TsdFrame(BaseFrame):
             return {}
 
     def _load_gm_data(self) -> list:
-        path = os.path.join(get_data_dir(), "gm_data.json")
+        path = os.path.join(get_base_dir(), "data", "gm_data.json")
         if not os.path.exists(path):
+            log.warning(f"TsdFrame: gm_data.json не найден: {path}")
             return []
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            log.info(f"TsdFrame: загружено {len(data)} ГМ для автодополнения")
             return data if isinstance(data, list) else []
         except Exception:
             return []
@@ -66,7 +70,6 @@ class TsdFrame(BaseFrame):
         root_layout.setContentsMargins(20, 20, 20, 20)
         root_layout.setSpacing(12)
 
-        # --- Кнопка «Назад в утилиты» ---
         top = QHBoxLayout()
         btn_back = SecondaryButton(
             "Назад в утилиты",
@@ -94,7 +97,6 @@ class TsdFrame(BaseFrame):
 
         card = create_card(self)
 
-        # --- Код ГМ ---
         row_gm = QHBoxLayout()
         lbl_gm = QLabel("Код ГМ:", card)
         lbl_gm.setFont(self.FONTS['label'])
@@ -109,7 +111,6 @@ class TsdFrame(BaseFrame):
         row_gm.addWidget(self.entry_gm, 1)
         card.layout().addLayout(row_gm)
 
-        # --- Название ГМ ---
         self.lbl_gm_name = QLabel("", card)
         self.lbl_gm_name.setFont(self.FONTS['small'])
         self.lbl_gm_name.setStyleSheet(
@@ -118,7 +119,6 @@ class TsdFrame(BaseFrame):
         self.lbl_gm_name.setMinimumHeight(20)
         card.layout().addWidget(self.lbl_gm_name)
 
-        # --- Номер ТСД ---
         row_tsd = QHBoxLayout()
         lbl_tsd = QLabel("Номер ТСД:", card)
         lbl_tsd.setFont(self.FONTS['label'])
@@ -133,7 +133,6 @@ class TsdFrame(BaseFrame):
         row_tsd.addWidget(self.entry_tsd, 1)
         card.layout().addLayout(row_tsd)
 
-        # --- Кнопка ---
         self.btn_generate = PrimaryButton(
             "Сгенерировать QR", on_click=self._generate_qr, parent=card
         )
@@ -146,7 +145,6 @@ class TsdFrame(BaseFrame):
 
         card.layout().addWidget(self.btn_generate)
 
-        # --- QR ---
         self.qr_label = QLabel(card)
         self.qr_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.qr_label.setMinimumHeight(320)
@@ -165,6 +163,7 @@ class TsdFrame(BaseFrame):
     # =========================================================
     def _attach_completer(self):
         if not self._gm_data:
+            log.warning("TsdFrame: _gm_data пуст, автодополнение не подключено")
             return
 
         items = []
@@ -173,21 +172,12 @@ class TsdFrame(BaseFrame):
             name = gm.get("Название", "")
             if code:
                 items.append(f"{code} — {name}")
+        
         if not items:
+            log.warning("TsdFrame: список items пуст, нечего подключать")
             return
-
-        try:
-            if self._completer is not None:
-                try:
-                    self._completer.activated.disconnect(self._completer_activated)
-                except (TypeError, RuntimeError):
-                    pass
-                self.entry_gm.setCompleter(None)
-        except RuntimeError:
-            pass
-
-        self._completer = None
-        self._completer_activated = None
+            
+        log.info(f"TsdFrame: подключаем автодополнение на {len(items)} элементов")
 
         model = QStringListModel(items, self.entry_gm)
         completer = QCompleter(model, self.entry_gm)
@@ -201,26 +191,22 @@ class TsdFrame(BaseFrame):
         self._completer = completer
 
         def _on_activated(text):
-            match = re.search(r'\b(\d{6})\b', text)
-            self.entry_gm.setText(match.group(1) if match else text)
+            # ВАЖНО: используем QTimer, чтобы AnimatedPlaceholderEntry успел завершить свои дела
+            clean_text = text.split(" — ", 1)[1] if " — " in text else text
+            QTimer.singleShot(0, lambda: self.entry_gm.setText(clean_text))
 
         self._completer_activated = _on_activated
         completer.activated.connect(_on_activated)
 
         def _on_text_edited(text):
-            try:
-                if self._completer is None:
-                    return
-                if not text:
-                    self._completer.popup().hide()
-                    return
-                self._completer.setCompletionPrefix(text)
-                if self._completer.completionCount() > 0:
-                    self._completer.complete()
-                else:
-                    self._completer.popup().hide()
-            except RuntimeError:
-                pass
+            if not text:
+                self._completer.popup().hide()
+                return
+            self._completer.setCompletionPrefix(text)
+            if self._completer.completionCount() > 0:
+                self._completer.complete()
+            else:
+                self._completer.popup().hide()
 
         self.entry_gm.textEdited.connect(_on_text_edited)
 

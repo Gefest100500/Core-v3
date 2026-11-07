@@ -1,42 +1,13 @@
 # ui/frames/gm_frame.py
 """
 Сетевые папки ГМ.
-
-- Поиск ГМ по коду или названию (с автокомплитом)
-- Создание папки ПИ ГМ {Название} {ДД.ММ.ГГГГ} в сетевой папке
-- Создание 5 подпапок внутри (1-4 сутки + Итоговые)
-- Создание ярлыка на рабочем столе
-
-Улучшения по сравнению с CTk-версией:
-- QCompleter вместо ручного поиска
-- win32com.client для создания ярлыков (быстрее PowerShell)
-- Fallback на PowerShell, если win32com не сработал
-- Двойной клик по результату — сразу создать ярлык
-- Запоминание последнего запроса (QSettings)
-
-Правки стиля:
-- Убраны все эмодзи
-- Кнопки — SVG-иконки
-
-ИЗМЕНЕНИЯ:
-- GM_DATA_PATH берётся из utils.file_utils — единая точка правды.
-  Раньше путь считался через тройной os.path.dirname(...).
-- Добавлена кнопка «Назад в утилиты».
-- Плейсхолдер приведён к единому виду (как в terminal_frame.py).
-- Автокомплит подключён в __init__ по образцу terminal_frame.py:
-  попап показывается по textEdited, стиль через style_popup.
-- Убран повторный вызов _attach_completer из search():
-  completer создаётся только один раз в __init__, чтобы не пересоздавать
-  объект, который держит поле ввода (это вызывало краш при клике на строку).
-- В _on_activated из выбранной строки извлекается только код (до " — "),
-  чтобы поиск находил ГМ по коду, а не по строке "код — название".
 """
 import os
 import json
 import subprocess
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QStringListModel, QSettings, QSize
+from PyQt6.QtCore import Qt, QStringListModel, QSettings, QSize, QTimer
 from PyQt6.QtGui import QIcon, QMouseEvent
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
@@ -90,7 +61,6 @@ class GmFrame(BaseFrame):
         root_layout.setContentsMargins(20, 20, 20, 20)
         root_layout.setSpacing(12)
 
-        # Кнопка «Назад в утилиты»
         top = QHBoxLayout()
         btn_back = SecondaryButton(
             "Назад в утилиты",
@@ -102,13 +72,11 @@ class GmFrame(BaseFrame):
         top.addStretch()
         root_layout.addLayout(top)
 
-        # Заголовок (без эмодзи)
         title = QLabel("СЕТЕВЫЕ ПАПКИ ГМ", self)
         title.setFont(self.FONTS['title'])
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root_layout.addWidget(title)
 
-        # Поле поиска
         search_row = QHBoxLayout()
         search_row.setSpacing(10)
         search_row.addStretch()
@@ -122,7 +90,6 @@ class GmFrame(BaseFrame):
         self.entry_gm.returnPressed.connect(self.search)
         search_row.addWidget(self.entry_gm)
 
-        # Кнопка "Найти" с SVG
         btn_search = PrimaryButton(
             "Найти",
             on_click=self.search,
@@ -139,7 +106,6 @@ class GmFrame(BaseFrame):
         search_row.addStretch()
         root_layout.addLayout(search_row)
 
-        # Статус
         self.status_label = QLabel("Введите запрос для поиска", self)
         self.status_label.setFont(self.FONTS['small'])
         self.status_label.setStyleSheet(
@@ -148,7 +114,6 @@ class GmFrame(BaseFrame):
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root_layout.addWidget(self.status_label)
 
-        # Контейнер результатов
         results_label = QLabel("Результаты поиска", self)
         results_label.setFont(self.FONTS['subtitle'])
         root_layout.addWidget(results_label)
@@ -166,7 +131,6 @@ class GmFrame(BaseFrame):
         self.results_scroll.setWidget(self.results_content)
         root_layout.addWidget(self.results_scroll, 1)
 
-        # Кнопка создания ярлыка
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
@@ -178,7 +142,6 @@ class GmFrame(BaseFrame):
         self.btn_create_shortcut.setMinimumWidth(340)
         self.btn_create_shortcut.setMinimumHeight(42)
         self.btn_create_shortcut.setEnabled(False)
-        # Иконка link
         link_icon = get_icon_simple("link", color="#FFFFFF", size=18)
         if not link_icon.isNull():
             self.btn_create_shortcut.setIcon(link_icon)
@@ -261,10 +224,14 @@ class GmFrame(BaseFrame):
         self._gm_completer = completer
 
         def _on_activated(text):
-            # из "991602 — Бугульма 1 Советская" берём только код "991602"
-            code = text.split(" — ", 1)[0].strip()
-            self.entry_gm.setText(code)
-            self.search()
+            # ОСТАВЛЯЕМ ТОЛЬКО НАЗВАНИЕ
+            if " — " in text:
+                name_only = text.split(" — ", 1)[1]
+                QTimer.singleShot(0, lambda: self.entry_gm.setText(name_only))
+            else:
+                QTimer.singleShot(0, lambda: self.entry_gm.setText(text))
+            
+            QTimer.singleShot(50, self.search)
 
         completer.activated.connect(_on_activated)
 

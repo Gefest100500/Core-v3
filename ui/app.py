@@ -22,7 +22,6 @@ from utils.data_manager import get_data_manager
 from ui.icons import get_icon, get_icon_simple
 from ui.styles import build_qss
 
-
 SIDEBAR_WIDTH_COLLAPSED = 64
 SIDEBAR_WIDTH_EXPANDED = 260
 SIDEBAR_ANIM_MS = 280
@@ -81,7 +80,6 @@ class AuditApp(QMainWindow):
 
         self._splash = None
         self._settings = QSettings(SETTINGS_ORG, SETTINGS_APP)
-        self._anim_timer = None # Таймер для анимации заставки
 
         self._status_call.connect(self._on_status_from_bg)
 
@@ -147,7 +145,7 @@ class AuditApp(QMainWindow):
 
         preload_names = [
             "inventory", "archive", "utils", "ai",
-            "timesheet", "terminal", "web",
+            "timesheet", "terminal", "settings",
         ]
         self._init_total = len(preload_names) + 1
         self._init_done = 0
@@ -190,13 +188,8 @@ class AuditApp(QMainWindow):
             QTimer.singleShot(0, self._on_init_finished)
             return
 
-        # Включаем "бегущую строку"
+        # Включаем анимацию бегущей строки
         self._update_splash("Загрузка писем из Outlook...", 90, is_loading=True)
-        
-        # Запускаем таймер, который будет постоянно обновлять интерфейс, пока идет парсинг
-        self._anim_timer = QTimer(self)
-        self._anim_timer.timeout.connect(self._force_update_ui)
-        self._anim_timer.start(50) # 20 раз в секунду
 
         import threading
 
@@ -215,19 +208,13 @@ class AuditApp(QMainWindow):
             except Exception:
                 log.exception("auto_fetch: ошибка сбора писем")
             finally:
-                # Останавливаем таймер
-                QTimer.singleShot(0, self._stop_anim_and_finish)
+                try:
+                    self._status_call.emit("Готов")
+                    QTimer.singleShot(0, self._on_init_finished)
+                except Exception:
+                    pass
 
         threading.Thread(target=_worker, daemon=True).start()
-
-    def _force_update_ui(self):
-        """Принудительно обновляет интерфейс, чтобы полоска бежала."""
-        QApplication.processEvents()
-
-    def _stop_anim_and_finish(self):
-        if self._anim_timer:
-            self._anim_timer.stop()
-        self._on_init_finished()
 
     def _on_init_finished(self):
         self._update_splash("Готово", 100)
@@ -412,12 +399,6 @@ class AuditApp(QMainWindow):
         self.setCentralWidget(container)
 
         self.show_tab("home")
-        QTimer.singleShot(500, self._fix_web_size)
-
-    def _fix_web_size(self):
-        web_frame = self.frames.get("web")
-        if web_frame and hasattr(web_frame, "refresh_size"):
-            web_frame.refresh_size()
 
     def _open_calculator(self):
         from ui.components.calculator_dialog import CalculatorDialog

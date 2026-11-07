@@ -6,18 +6,19 @@ import os
 from datetime import datetime
 from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QLabel, QFrame, QComboBox, QWidget,
-    QFileDialog, QPushButton, QLineEdit, QCheckBox
+    QVBoxLayout, QHBoxLayout, QLabel, QFrame, QWidget,
+    QFileDialog, QPushButton, QCheckBox
 )
 
 from ui.frames.base_frame import BaseFrame
 from ui.components.widgets import (
-    create_card, PrimaryButton, SecondaryButton, StyledCombo
+    create_card, PrimaryButton, SecondaryButton, StyledCombo,
+    AnimatedPlaceholderEntry
 )
 from ui.icons import get_icon_simple
 from ui.components.test_dialog import TestDialog
 from utils.logger import log
-from core.terminal_helper import xor_encrypt, xor_decrypt, get_password_key
+from core.terminal_helper import xor_encrypt, get_password_key
 from core.log_sender import send_log_to_dev, should_auto_send
 
 
@@ -53,21 +54,10 @@ class SettingsFrame(BaseFrame):
         row_email.setSpacing(10)
         row_email.addWidget(self._make_label("Корпоративная почта:"))
         
-        self.input_email = QLineEdit()
-        self.input_email.setPlaceholderText("example@magnit.ru")
-        self.input_email.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: {self.COLORS.get('card', '#222222')};
-                color: {self.COLORS.get('text', '#E0E0E0')};
-                border: 1px solid {self.COLORS.get('border', '#333333')};
-                border-radius: 6px;
-                padding: 6px 10px;
-                font-size: 13px;
-            }}
-            QLineEdit:focus {{
-                border: 1px solid {self.COLORS.get('button', '#D42626')};
-            }}
-        """)
+        self.input_email = AnimatedPlaceholderEntry(
+            placeholder="example@magnit.ru",
+            parent=card_mail
+        )
         self.input_email.setFixedWidth(300)
         saved_email = self._settings.value("user_email", "")
         self.input_email.setText(str(saved_email))
@@ -138,23 +128,13 @@ class SettingsFrame(BaseFrame):
         row_pass = QHBoxLayout()
         row_pass.setSpacing(10)
         
-        self.input_password = QLineEdit()
-        self.input_password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.input_password.setPlaceholderText("Введите новый пароль (оставьте пустым, чтобы не менять)")
-        self.input_password.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: {self.COLORS.get('card', '#222222')};
-                color: {self.COLORS.get('text', '#E0E0E0')};
-                border: 1px solid {self.COLORS.get('border', '#333333')};
-                border-radius: 6px;
-                padding: 6px 10px;
-                font-size: 13px;
-            }}
-            QLineEdit:focus {{
-                border: 1px solid {self.COLORS.get('button', '#D42626')};
-            }}
-        """)
-        self.input_password.setFixedWidth(300)
+        self.input_password = AnimatedPlaceholderEntry(
+            placeholder="Введите новый пароль (оставьте пустым, чтобы не менять)",
+            parent=card_folders
+        )
+        # Устанавливаем режим пароля для AnimatedPlaceholderEntry
+        self.input_password.setEchoMode(self.input_password.EchoMode.Password)
+        self.input_password.setFixedWidth(400)
         row_pass.addWidget(self.input_password)
         row_pass.addStretch()
         card_folders.layout().addLayout(row_pass)
@@ -291,7 +271,6 @@ class SettingsFrame(BaseFrame):
         last_sent = self._settings.value("last_log_sent", "")
         if should_auto_send(last_sent):
             log.info("settings_frame: запуск автоотправки лога")
-            # Даем программе загрузиться и отправляем в фоне через 5 секунд
             from PyQt6.QtCore import QTimer
             QTimer.singleShot(5000, self._do_auto_send)
 

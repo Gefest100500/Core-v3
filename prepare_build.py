@@ -7,7 +7,7 @@ import subprocess
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
-# Список файлов, которые НЕЛЬЗЯ удалять (справочники)
+# Список файлов, которые НЕЛЬЗЯ удалять (справочники и кэш)
 KEEP_FILES = {
     "gm_data.json",
     "gm_ip.json",
@@ -17,6 +17,7 @@ KEEP_FILES = {
     "kv_reason_schema.json",
     "unwanted.json",
     "timesheet.json",
+    "gm_cities_cache.json",  # <-- ДОБАВЛЕНО: кэш координат
 }
 
 # Список папок/файлов, которые нужно удалить (личные данные)
@@ -26,7 +27,7 @@ REMOVE_ITEMS = [
     "inventory_archive.json",
     "emails.json",
     "gm_notes.json",
-    "gm_cities_cache.json",
+    # "gm_cities_cache.json",  # <-- УБРАНО: он теперь в KEEP_FILES
     "ml",         # база данных Shadow Engine
     "webengine",  # кэш браузера
     "emails",     # папка с письмами
@@ -53,11 +54,11 @@ def clean_data():
         else:
             print(f"  Пропущено (нет): {item}")
 
-    # Проверяем, что все справочники на месте
+    # Проверяем, что все справочники и кэш на месте
     for f in KEEP_FILES:
         path = os.path.join(DATA_DIR, f)
         if not os.path.exists(path):
-            print(f"  ВНИМАНИЕ: справочник {f} отсутствует!")
+            print(f"  ВНИМАНИЕ: справочник/кэш {f} отсутствует!")
 
     print("Очистка data завершена.")
 
@@ -66,7 +67,6 @@ def clean_registry():
     print("\nОчистка настроек в реестре (QSettings)...")
     key_path = r"HKCU\Software\SilchenkoAleksey\CoreV3"
     try:
-        # Используем reg delete через subprocess
         result = subprocess.run(
             ["reg", "delete", key_path, "/f"],
             capture_output=True,
@@ -88,7 +88,6 @@ def clean_localappdata():
     
     app_dir = os.path.join(localappdata, "Core_V3_0")
     if os.path.exists(app_dir):
-        # Спрашиваем только если папка реально есть
         answer = input(f"\nУдалить {app_dir} для теста чистой установки? (y/n): ")
         if answer.lower() == 'y':
             try:

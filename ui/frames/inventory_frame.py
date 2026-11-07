@@ -1,11 +1,6 @@
 # ui/frames/inventory_frame.py
 r"""
 Инвентаризация.
-
-ИЗМЕНЕНИЯ:
-- Прогресс-бары (по дням и по чек-листу) теперь СЕРЫЕ (в едином стиле).
-- Убран зелёный цвет из процента чек-листа.
-- Тёмная шапка для диалога «План инвентаризации» (WinAPI).
 """
 import ctypes
 import re
@@ -47,7 +42,7 @@ from core.inventory_helper import (
 
 
 # =========================================================
-# ТЁМНЫЙ TITLE BAR (Windows API) — локальная копия из main.py
+# ТЁМНЫЙ TITLE BAR (Windows API)
 # =========================================================
 DWMWA_USE_IMMERSIVE_DARK_MODE = 20
 DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19
@@ -413,11 +408,12 @@ class InventoryFrame(BaseFrame):
         entry.setCompleter(completer)
 
         def _on_activated(text):
-            match = re.search(r'\b(\d{6})\b', text)
-            if match:
-                entry.setText(match.group(1))
+            # ОСТАВЛЯЕМ ТОЛЬКО НАЗВАНИЕ (как в ТСД)
+            if " — " in text:
+                name_only = text.split(" — ", 1)[1]
+                QTimer.singleShot(0, lambda: entry.setText(name_only))
             else:
-                entry.setText(text)
+                QTimer.singleShot(0, lambda: entry.setText(text))
 
         completer.activated.connect(_on_activated)
 
@@ -484,24 +480,26 @@ class InventoryFrame(BaseFrame):
             )
             return
 
-        code = self.gm_input.text().strip()
+        text = self.gm_input.text().strip()
+        gm = None
+        code = ""
 
-        if len(code) != 6 or not code.isdigit():
-            match = re.search(r'\b(\d{6})\b', code)
-            if match:
-                code = match.group(1)
-                self.gm_input.setText(code)
+        # 1. Пытаемся найти по коду (6 цифр)
+        match = re.search(r'\b(\d{6})\b', text)
+        if match:
+            code = match.group(1)
+            gm = find_gm_by_code(code, self.gm_data)
 
-        if len(code) != 6 or not code.isdigit():
-            self.lbl_form_status.setText("⚠️ Введите корректный код ГМ (6 цифр)")
-            self.lbl_form_status.setStyleSheet(
-                f"color: {self.COLORS.get('error', '#FF5252')};"
-            )
-            return
-
-        gm = find_gm_by_code(code, self.gm_data)
+        # 2. Если не нашли по коду, ищем по названию
         if not gm:
-            self.lbl_form_status.setText("⚠️ ГМ не найден в базе")
+            for g in self.gm_data:
+                if g.get("Название", "").lower() == text.lower():
+                    gm = g
+                    code = str(g.get("Код", ""))
+                    break
+
+        if not gm:
+            self.lbl_form_status.setText("⚠️ ГМ не найден (введите код или выберите из списка)")
             self.lbl_form_status.setStyleSheet(
                 f"color: {self.COLORS.get('error', '#FF5252')};"
             )
@@ -970,7 +968,6 @@ class InventoryFrame(BaseFrame):
         dlg.setWindowTitle(f"План инвентаризации — Вариант {variant_key}")
         dlg.resize(800, 700)
 
-        # Тёмная шапка для диалога (WinAPI)
         _apply_dark_title_bar(dlg)
 
         layout = QVBoxLayout(dlg)

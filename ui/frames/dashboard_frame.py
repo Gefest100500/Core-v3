@@ -7,13 +7,14 @@
 - Цвета в PieChart, LineChart, HBar оставлены как есть.
 - В центре круга "Аналитические зоны" теперь отображается сумма
   БЕЗ учёта РМ и МЦ (если она есть в данных, иначе — с РМ и МЦ).
+- При выборе ГМ из автодополнения в поле подставляется только название.
 """
 import os
 import re
 from datetime import date, datetime
 
 from PyQt6.QtCore import (
-    Qt, QSize, QRectF, QStringListModel, QPointF, QSettings
+    Qt, QSize, QRectF, QStringListModel, QPointF, QSettings, QTimer
 )
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QFont, QFontMetrics, QPixmap,
@@ -529,7 +530,12 @@ class GmFilter(QFrame):
         self._completer = completer
 
         def _on_activated(text):
-            self.entry.setText(text)
+            # ОСТАВЛЯЕМ ТОЛЬКО НАЗВАНИЕ
+            if " — " in text:
+                name_only = text.split(" — ", 1)[1]
+                QTimer.singleShot(0, lambda: self.entry.setText(name_only))
+            else:
+                QTimer.singleShot(0, lambda: self.entry.setText(text))
 
         self._completer_activated = _on_activated
         completer.activated.connect(_on_activated)
@@ -571,8 +577,19 @@ class GmFilter(QFrame):
         text = self.get_text()
         if not text:
             return ""
+        # Если ввели код — ищем его
         m = re.search(r"\b(\d{6})\b", text)
-        return m.group(1) if m else ""
+        if m:
+            return m.group(1)
+        
+        # Если ввели название, ищем код в _gm_list
+        for gm in self._gm_list:
+            display = gm.get("display", "")
+            if " — " in display:
+                name_only = display.split(" — ", 1)[1]
+                if name_only.lower() == text.lower():
+                    return gm.get("code", "")
+        return ""
 
 
 # =========================================================

@@ -1,16 +1,12 @@
 # ui/splash.py
 """
 Заставка (SplashScreen) для Core V3.0.
-
-- Тёмный фон, логотип «CORE», тонкий прогресс-бар, статус.
-- Полноэкранная.
-- Бесконечная бегущая полоска во время загрузки.
-- Плавное исчезновение (fade-out) при закрытии.
 """
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QPoint
+from PyQt6.QtGui import QFont, QMouseEvent
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QProgressBar, QFrame, QGraphicsOpacityEffect
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, 
+    QGraphicsOpacityEffect, QPushButton
 )
 
 from ui.icons import get_icon_simple
@@ -24,17 +20,17 @@ class SplashScreen(QWidget):
         self._colors = colors
         self._fonts = fonts
 
-        # Полноэкранный режим, без рамки
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint
+            Qt.WindowType.Window
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
 
-        # Эффект прозрачности для плавного исчезновения
         self._opacity_effect = QGraphicsOpacityEffect(self)
         self._opacity_effect.setOpacity(1.0)
         self.setGraphicsEffect(self._opacity_effect)
+
+        self._drag_pos = None
 
         self._setup_ui()
         self.showFullScreen()
@@ -65,40 +61,68 @@ class SplashScreen(QWidget):
         frame.setObjectName("SplashBorder")
         outer.addWidget(frame)
 
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(80, 80, 80, 80)
-        layout.setSpacing(20)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Главный вертикальный слой
+        main_layout = QVBoxLayout(frame)
+        main_layout.setContentsMargins(20, 20, 20, 80) # Отступы по краям
+        main_layout.setSpacing(20)
 
-        # Логотип (иконка)
+        # --- ВЕРХНЯЯ ПАНЕЛЬ С КНОПКОЙ ---
+        top_bar = QHBoxLayout()
+        top_bar.addStretch() # Прижимаем всё вправо
+        
+        self.btn_minimize = QPushButton("—", frame)
+        self.btn_minimize.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_minimize.setFixedSize(30, 30)
+        self.btn_minimize.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {text_dim};
+                border: none;
+                font-size: 20px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                color: {text};
+                background-color: #333333;
+                border-radius: 4px;
+            }}
+        """)
+        self.btn_minimize.clicked.connect(self.showMinimized)
+        top_bar.addWidget(self.btn_minimize)
+        
+        main_layout.addLayout(top_bar)
+
+        # --- ЦЕНТРАЛЬНЫЙ БЛОК (Логотип, текст, полоска) ---
+        center_layout = QVBoxLayout()
+        center_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        center_layout.setSpacing(20)
+
         logo_icon = get_icon_simple("home", color=accent_light, size=96)
         logo_label = QLabel(frame)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if not logo_icon.isNull():
             logo_label.setPixmap(logo_icon.pixmap(96, 96))
-        layout.addWidget(logo_label)
+        center_layout.addWidget(logo_label)
 
-        # Логотип (текст)
         title = QLabel("CORE", frame)
         title.setFont(QFont("Segoe UI", 48, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {accent_light};")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        center_layout.addWidget(title)
 
         subtitle = QLabel("Корпоративный аудит", frame)
         subtitle.setFont(QFont("Segoe UI", 16))
         subtitle.setStyleSheet(f"color: {text_dim};")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(subtitle)
+        center_layout.addWidget(subtitle)
 
-        layout.addSpacing(40)
+        center_layout.addSpacing(40)
 
-        # Статус
         self.status_label = QLabel("Инициализация...", frame)
         self.status_label.setFont(QFont("Segoe UI", 13))
         self.status_label.setStyleSheet(f"color: {text};")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.status_label)
+        center_layout.addWidget(self.status_label)
 
         # Прогресс-бар
         progress_container = QVBoxLayout()
@@ -121,7 +145,10 @@ class SplashScreen(QWidget):
             }}
         """)
         progress_container.addWidget(self.progress)
-        layout.addLayout(progress_container)
+        center_layout.addLayout(progress_container)
+
+        # Добавляем центральный блок в главный слой (он растянется)
+        main_layout.addLayout(center_layout, 1)
 
     # =========================================================
     # ПУБЛИЧНЫЕ МЕТОДЫ
@@ -130,14 +157,11 @@ class SplashScreen(QWidget):
         self.status_label.setText(text)
         
         if is_loading:
-            # Включаем режим "бегущей строки" (0, 0)
             self.progress.setRange(0, 0)
         else:
-            # Возвращаем обычный режим (0, 100)
             self.progress.setRange(0, 100)
 
     def set_progress(self, value: int):
-        # Если мы в режиме загрузки, не трогаем прогресс
         if self.progress.maximum() == 0:
             return
         self.progress.setValue(max(0, min(100, value)))
@@ -158,3 +182,20 @@ class SplashScreen(QWidget):
 
         self._anim.finished.connect(_done)
         self._anim.start()
+
+    # =========================================================
+    # ПЕРЕТАСКИВАНИЕ
+    # =========================================================
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if event.buttons() == Qt.MouseButton.LeftButton and self._drag_pos:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        self._drag_pos = None
+        event.accept()

@@ -2,26 +2,6 @@
 """
 Менеджер данных — JSON-хранилище с кэшем, очередью записи,
 атомарной записью и асинхронным чтением.
-
-Потокобезопасный. Singleton через get_data_manager().
-
-ИЗМЕНЕНИЯ:
-- read_json_async: чтение и обновление кэша под тем же локом,
-  что и _read_file.
-- BASE_DIR и DATA_DIR берутся из utils.file_utils — единая точка
-  правды.
-- DATA_DIR теперь %LOCALAPPDATA%/Core_V3_0/data (через get_data_dir).
-- Добавлены методы для работы с emails.json.
-- ФИКС ДЕДЛОКА: add_action и set_history вызывали _read_file
-  внутри with lock: — _read_file сам берёт тот же лок.
-  Теперь чтение идёт ДО взятия лока.
-- ФИКС WINDOWS PermissionError: _writer_loop пишет файл без лока,
-  а _read_file читает его с локом. На Windows это приводило к
-  PermissionError при чтении, пока файл открыт на запись.
-  Теперь _writer_loop берёт тот же лок, что и _read_file,
-  через _write_file_safe().
-- Добавлен STANDARD_COMMENTS_PATH: теперь comments_frame.py
-  читает standard_comments.json из DATA_DIR, а не из корня проекта.
 """
 import concurrent.futures
 import hashlib
@@ -33,12 +13,12 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from utils.file_utils import get_base_dir, get_data_dir
+from utils.file_utils import get_base_dir
 from utils.logger import log
 
 
 BASE_DIR = Path(get_base_dir())
-DATA_DIR = Path(get_data_dir())
+DATA_DIR = BASE_DIR / "data"
 
 HISTORY_PATH = DATA_DIR / "actions_history.json"
 INVENTORY_PATH = DATA_DIR / "active_inventory.json"
@@ -75,7 +55,6 @@ class DataManager:
         log.info("DataManager инициализирован")
 
     def set_root(self, root):
-        """Сохраняем ссылку на главное окно."""
         self._root = root
 
     # =========================================================
@@ -105,7 +84,6 @@ class DataManager:
     # ВНУТРЕННИЕ
     # =========================================================
     def _get_lock(self, name):
-        """Возвращает лок для имени. Потокобезопасно создаёт."""
         with self._locks_guard:
             if name not in self._locks:
                 self._locks[name] = threading.Lock()
@@ -154,7 +132,6 @@ class DataManager:
                 return cached[0] if cached else None
 
     def _write_file(self, name, path, data):
-        """Пишет файл. Лок уже взят в _writer_loop."""
         try:
             path = Path(path)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -283,7 +260,7 @@ class DataManager:
         self._write_async("gm_notes", GM_NOTES_PATH, data)
 
     # =========================================================
-    # EMAILS (письма инвентаризации)
+    # EMAILS
     # =========================================================
     def get_emails(self):
         return self._read_file("emails", EMAILS_PATH) or []

@@ -7,6 +7,7 @@
 - Поля ГМ переведены на AnimatedPlaceholderEntry
   (побуквенный плейсхолдер). QCompleter принудительно
   показывается при вводе (complete()).
+- Удалена кнопка "Поменять" и метод _swap_gms.
 """
 import os
 
@@ -121,26 +122,13 @@ class DistanceFrame(BaseFrame):
             on_click=self.calculate,
             parent=self
         )
-        self.btn_calc.setMinimumWidth(280)
+        self.btn_calc.setMinimumWidth(380)
         self.btn_calc.setMinimumHeight(50)
         distance_icon = get_icon_simple("distance", color="#FFFFFF", size=18)
         if not distance_icon.isNull():
             self.btn_calc.setIcon(distance_icon)
             self.btn_calc.setIconSize(QSize(18, 18))
         btn_row.addWidget(self.btn_calc)
-
-        btn_swap = SecondaryButton(
-            "Поменять",
-            on_click=self._swap_gms,
-            parent=self
-        )
-        btn_swap.setMinimumWidth(160)
-        btn_swap.setMinimumHeight(50)
-        swap_icon = get_icon_simple("swap", color=self.COLORS.get('text', '#E0E0E0'), size=16)
-        if not swap_icon.isNull():
-            btn_swap.setIcon(swap_icon)
-            btn_swap.setIconSize(QSize(16, 16))
-        btn_row.addWidget(btn_swap)
 
         btn_clear = SecondaryButton(
             "Очистить",
@@ -245,14 +233,10 @@ class DistanceFrame(BaseFrame):
         completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         completer.setMaxVisibleItems(10)
 
-        # Единый стиль popup
         style_popup(completer)
 
         entry.setCompleter(completer)
 
-        # Принудительно показываем popup при вводе.
-        # QCompleter сам по себе должен это делать, но с кастомным
-        # QLineEdit (paintEvent) иногда не срабатывает — вызываем явно.
         def _on_text_edited_for_completer(text):
             if not text:
                 completer.popup().hide()
@@ -285,15 +269,6 @@ class DistanceFrame(BaseFrame):
             self._settings.setValue("distance_gm2", self.entry_gm2.text().strip())
         except Exception:
             pass
-
-    # =========================================================
-    # ВСПОМОГАТЕЛЬНЫЕ
-    # =========================================================
-    def _swap_gms(self):
-        t1 = self.entry_gm1.text()
-        t2 = self.entry_gm2.text()
-        self.entry_gm1.setText(t2)
-        self.entry_gm2.setText(t1)
 
     # =========================================================
     # РАСЧЁТ
