@@ -1,7 +1,6 @@
 # ui/components/wizard_dialog.py
 """
 Мастер первого запуска Core V3.0.
-Пошаговый интерфейс для первоначальной настройки.
 """
 import os
 from PyQt6.QtCore import Qt, QSettings, QPoint
@@ -12,7 +11,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ui.icons import get_icon_simple
-from ui.components.widgets import PrimaryButton, SecondaryButton, StyledCombo
+from ui.components.widgets import StyledCombo
 from utils.logger import log
 from core.terminal_helper import xor_encrypt, get_password_key
 
@@ -106,23 +105,52 @@ class WizardDialog(QDialog):
         self._build_page_terminal()
         self._build_page_finish()
 
-        # --- НИЖНЯЯ ПАНЕЛЬ С КНОПКАМИ ---
+        # --- НИЖНЯЯ ПАНЕЛЬ С КНОПКАМИ (РУЧНЫЕ СТИЛИ) ---
         footer = QFrame()
         footer.setStyleSheet("background: transparent; border: none;")
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(20, 10, 20, 0)
         
-        self.btn_back = SecondaryButton("Назад", on_click=self._go_back, parent=footer)
-        self.btn_back.setFixedWidth(120)
-        self.btn_back.setMinimumHeight(40)
+        # Кнопка "Назад"
+        self.btn_back = QPushButton("Назад")
+        self.btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_back.setFixedSize(120, 40)
+        self.btn_back.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {self.colors.get('text', '#E0E0E0')};
+                border: 1px solid {self.colors.get('border', '#333333')};
+                border-radius: 6px;
+                font-size: 14px;
+            }}
+            QPushButton:hover {{
+                background-color: {self.colors.get('card', '#222222')};
+            }}
+        """)
+        self.btn_back.clicked.connect(self._go_back)
         self.btn_back.hide()
         footer_layout.addWidget(self.btn_back)
         
         footer_layout.addStretch()
         
-        self.btn_next = PrimaryButton("Далее", on_click=self._go_next, parent=footer)
-        self.btn_next.setFixedWidth(120)
-        self.btn_next.setMinimumHeight(40)
+        # Кнопка "Далее"
+        self.btn_next = QPushButton("Далее")
+        self.btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_next.setFixedSize(150, 40)
+        self.btn_next.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors.get('button', '#D42626')};
+                color: #FFFFFF;
+                border: none;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {self.colors.get('hover', '#B71C1C')};
+            }}
+        """)
+        self.btn_next.clicked.connect(self._go_next)
         footer_layout.addWidget(self.btn_next)
         
         layout.addWidget(footer)
@@ -228,8 +256,22 @@ class WizardDialog(QDialog):
         """)
         row.addWidget(self.input_folder, 1)
         
-        btn_browse = SecondaryButton("Обзор...", on_click=self._browse_folder, parent=page)
-        btn_browse.setFixedWidth(100)
+        btn_browse = QPushButton("Обзор...")
+        btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_browse.setFixedSize(100, 36)
+        btn_browse.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {self.colors.get('text', '#E0E0E0')};
+                border: 1px solid {self.colors.get('border', '#333333')};
+                border-radius: 6px;
+                font-size: 13px;
+            }}
+            QPushButton:hover {{
+                background-color: {self.colors.get('card', '#222222')};
+            }}
+        """)
+        btn_browse.clicked.connect(self._browse_folder)
         row.addWidget(btn_browse)
         
         layout.addLayout(row)
@@ -335,7 +377,7 @@ class WizardDialog(QDialog):
             self.input_folder.setText(folder)
 
     def _go_next(self):
-        if self.current_page == 5: # Последняя страница (теперь их 6, индексы 0..5)
+        if self.current_page == 5:
             self._save_settings()
             self.accept()
             return
@@ -376,16 +418,13 @@ class WizardDialog(QDialog):
         self._settings.setValue("data_folder", folder)
         self._settings.setValue("email_days_back", days_val)
         
-        # Сохраняем пароль для терминала (в зашифрованном виде)
         if password:
             key = get_password_key()
             token = xor_encrypt(password, key)
             self._settings.setValue("terminal_password", token)
         
-        # Ставим флаг, что мастер пройден
         self._settings.setValue("wizard_completed", "true")
-        
-        log.info(f"Мастер настройки завершен: email={email}, folder={folder}, days={days_val}, password={'да' if password else 'нет'}")
+        log.info(f"Мастер настройки завершен: email={email}, folder={folder}, days={days_val}")
 
     # --- Перетаскивание ---
     def mousePressEvent(self, event: QMouseEvent):

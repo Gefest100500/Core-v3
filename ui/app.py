@@ -3,7 +3,6 @@
 Главное окно Core V3.0.
 """
 import os
-import json
 from datetime import datetime, timedelta
 
 from PyQt6.QtCore import (
@@ -19,7 +18,7 @@ from PyQt6.QtWidgets import (
 
 from config import get_config, get_fonts
 from utils.logger import log
-from utils.data_manager import get_data_manager, EMAILS_PATH
+from utils.data_manager import get_data_manager
 from ui.icons import get_icon, get_icon_simple
 from ui.styles import build_qss
 
@@ -82,7 +81,7 @@ class AuditApp(QMainWindow):
 
         self._splash = None
         self._settings = QSettings(SETTINGS_ORG, SETTINGS_APP)
-        self._splash_watch_timer = None
+        self._anim_timer = None # Таймер для анимации заставки
 
         self._status_call.connect(self._on_status_from_bg)
 
@@ -191,13 +190,13 @@ class AuditApp(QMainWindow):
             QTimer.singleShot(0, self._on_init_finished)
             return
 
-        self._update_splash("Загрузка писем из Outlook...", 90)
-
-        # Запускаем таймер на 200 мс (быстрее), чтобы ловить сохранение
-        self._last_emails_count = -1
-        self._splash_watch_timer = QTimer(self)
-        self._splash_watch_timer.timeout.connect(self._check_emails_progress)
-        self._splash_watch_timer.start(200)
+        # Включаем "бегущую строку"
+        self._update_splash("Загрузка писем из Outlook...", 90, is_loading=True)
+        
+        # Запускаем таймер, который будет постоянно обновлять интерфейс, пока идет парсинг
+        self._anim_timer = QTimer(self)
+        self._anim_timer.timeout.connect(self._force_update_ui)
+        self._anim_timer.start(50) # 20 раз в секунду
 
         import threading
 
@@ -216,50 +215,32 @@ class AuditApp(QMainWindow):
             except Exception:
                 log.exception("auto_fetch: ошибка сбора писем")
             finally:
-                # Обязательно ждем завершения, затем проверяем финальный размер
-                QTimer.singleShot(0, self._stop_watch_and_finish)
+                # Останавливаем таймер
+                QTimer.singleShot(0, self._stop_anim_and_finish)
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    def _check_emails_progress(self):
-        """Читает emails.json и обновляет заставку."""
-        if not self._splash:
-            return
-        try:
-            if os.path.exists(EMAILS_PATH):
-                with open(EMAILS_PATH, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    count = len(data) if isinstance(data, list) else 0
-                    
-                    if count != self._last_emails_count:
-                        self._last_emails_count = count
-                        self._splash.set_counter(count, count)
-                        self._splash.set_status(f"Найдено писем в базе: {count}")
-        except Exception as e:
-            log.debug(f"Ошибка чтения emails.json для заставки: {e}")
+    def _force_update_ui(self):
+        """Принудительно обновляет интерфейс, чтобы полоска бежала."""
+        QApplication.processEvents()
 
-    def _stop_watch_and_finish(self):
-        if self._splash_watch_timer:
-            self._splash_watch_timer.stop()
-        
-        # Принудительно обновляем счетчик в последний раз перед закрытием
-        self._check_emails_progress()
-        
-        # Ставим полный прогресс и переходим к завершению
-        self._update_splash("Готово", 100)
-        QTimer.singleShot(100, self._on_init_finished)
+    def _stop_anim_and_finish(self):
+        if self._anim_timer:
+            self._anim_timer.stop()
+        self._on_init_finished()
 
     def _on_init_finished(self):
+        self._update_splash("Готово", 100)
         try:
             self.ready.emit()
         except Exception:
             pass
 
-    def _update_splash(self, text, progress):
+    def _update_splash(self, text, progress, is_loading=False):
         if self._splash is None:
             return
         try:
-            self._splash.set_status(text)
+            self._splash.set_status(text, is_loading=is_loading)
             self._splash.set_progress(progress)
             QApplication.processEvents()
         except Exception:
@@ -293,7 +274,6 @@ class AuditApp(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # --- Сайдбар ---
         self.sidebar = QFrame()
         self.sidebar.setObjectName("Sidebar")
         self.sidebar.setFixedWidth(SIDEBAR_WIDTH_COLLAPSED)
@@ -352,14 +332,12 @@ class AuditApp(QMainWindow):
 
         main_layout.addWidget(self.sidebar)
 
-        # --- Контент ---
         self.content = QStackedWidget()
         self.content.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
         main_layout.addWidget(self.content, 1)
 
-        # --- Статус-бар ---
         self.status_bar = QFrame()
         self.status_bar.setObjectName("StatusBar")
         self.status_bar.setFixedHeight(36)

@@ -4,9 +4,8 @@
 
 - Тёмный фон, логотип «CORE», тонкий прогресс-бар, статус.
 - Полноэкранная.
-- Серая цветовая гамма (не красная).
+- Бесконечная бегущая полоска во время загрузки.
 - Плавное исчезновение (fade-out) при закрытии.
-- Показывает счетчик найденных/обработанных писем.
 """
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QFont
@@ -47,8 +46,6 @@ class SplashScreen(QWidget):
         bg = self._colors.get("bg", "#1B1B1B")
         text = self._colors.get("text", "#E0E0E0")
         text_dim = self._colors.get("text_dim", "#A0A0A0")
-
-        # СЕРЫЙ цвет вместо красного
         accent_light = "#888888"
 
         self.setStyleSheet(f"""
@@ -74,16 +71,14 @@ class SplashScreen(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Логотип (иконка)
-        logo_icon = get_icon_simple(
-            "home", color=accent_light, size=96
-        )
+        logo_icon = get_icon_simple("home", color=accent_light, size=96)
         logo_label = QLabel(frame)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if not logo_icon.isNull():
             logo_label.setPixmap(logo_icon.pixmap(96, 96))
         layout.addWidget(logo_label)
 
-        # Логотип (текст) — серый
+        # Логотип (текст)
         title = QLabel("CORE", frame)
         title.setFont(QFont("Segoe UI", 48, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {accent_light};")
@@ -105,15 +100,7 @@ class SplashScreen(QWidget):
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.status_label)
 
-        # Счетчик писем (скрыт по умолчанию)
-        self.counter_label = QLabel("", frame)
-        self.counter_label.setFont(QFont("Segoe UI", 11))
-        self.counter_label.setStyleSheet(f"color: {text_dim};")
-        self.counter_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.counter_label.hide()
-        layout.addWidget(self.counter_label)
-
-        # Прогресс-бар (тонкий, по центру)
+        # Прогресс-бар
         progress_container = QVBoxLayout()
         progress_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -139,23 +126,24 @@ class SplashScreen(QWidget):
     # =========================================================
     # ПУБЛИЧНЫЕ МЕТОДЫ
     # =========================================================
-    def set_status(self, text: str):
+    def set_status(self, text: str, is_loading: bool = False):
         self.status_label.setText(text)
+        
+        if is_loading:
+            # Включаем режим "бегущей строки" (0, 0)
+            self.progress.setRange(0, 0)
+        else:
+            # Возвращаем обычный режим (0, 100)
+            self.progress.setRange(0, 100)
 
     def set_progress(self, value: int):
+        # Если мы в режиме загрузки, не трогаем прогресс
+        if self.progress.maximum() == 0:
+            return
         self.progress.setValue(max(0, min(100, value)))
 
-    def set_counter(self, found: int, processed: int):
-        """Обновляет счетчик писем на заставке."""
-        self.counter_label.setText(f"Найдено писем: {found} | Обработано: {processed}")
-        self.counter_label.show()
-
     def fade_out_and_close(self, on_finished=None):
-        """Плавно скрывает заставку и закрывает её.
-
-        Args:
-            on_finished: callable, вызывается после завершения анимации.
-        """
+        """Плавно скрывает заставку и закрывает её."""
         self._anim = QPropertyAnimation(self._opacity_effect, b"opacity")
         self._anim.setDuration(400)
         self._anim.setStartValue(1.0)
