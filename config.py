@@ -11,11 +11,6 @@
 - Шрифты создаются через QFont — вызывать get_fonts() ТОЛЬКО после QApplication.
 - Обратная совместимость: FOLDERS, COLORS, BRAK_UTIL_TOLERANCE и др.
   доступны как module-level атрибуты через __getattr__.
-
-ИЗМЕНЕНИЯ:
-- Убрано поле email_folders. Поиск писем теперь всегда идёт
-  во всех папках Входящих рекурсивно — без настройки имён папок.
-- DATA_DIR теперь берётся из get_data_dir() (%LOCALAPPDATA%/Core_V3_0/data).
 """
 import json
 import os
@@ -23,7 +18,7 @@ from typing import Any, Dict, Optional
 
 from PyQt6.QtGui import QFont
 
-from utils.file_utils import get_base_dir, get_data_dir
+from utils.file_utils import get_base_dir, get_user_data_dir
 
 
 # =========================================================
@@ -70,19 +65,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 # КЛАСС CONFIG
 # =========================================================
 class Config:
-    """Конфигурация приложения.
-
-    Ленивая инициализация:
-    - Папки создаются только при первом обращении к FOLDERS
-      или при явном init_folders().
-    - config.json читается при создании экземпляра.
-    - Шрифты создаются только при вызове get_fonts().
-    """
+    """Конфигурация приложения."""
 
     def __init__(self, config_path: Optional[str] = None):
         # --- Пути (не создают папки) ---
         self.BASE_DIR = get_base_dir()
-        self.DATA_DIR = get_data_dir()
+        self.DATA_DIR = get_user_data_dir()  # <--- ИСПРАВЛЕНО ЗДЕСЬ
         self.LOG_DIR = os.path.join(self.BASE_DIR, "Logs")
         self.INPUT_FOLDER = os.path.join(self.BASE_DIR, "Файлы")
         self.OUTPUT_FOLDER = os.path.join(self.BASE_DIR, "Готовые")
