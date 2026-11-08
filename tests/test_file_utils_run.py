@@ -8,8 +8,8 @@ get_base_dir патчим через monkeypatch — иначе все папк�
 
 ИЗМЕНЕНИЯ:
 - test_data_dir_created обновлён под новое поведение get_data_dir():
-  папка данных теперь в %LOCALAPPDATA%/Core_V3_0/data (с fallback
-  в корень проекта, если LOCALAPPDATA недоступна).
+  папка данных теперь рядом с get_base_dir() (data/), а не в
+  %LOCALAPPDATA%. LOCALAPPDATA больше не используется.
 """
 import os
 import sys
@@ -47,19 +47,6 @@ def fake_base(tmp_path, monkeypatch):
     return tmp_path
 
 
-@pytest.fixture
-def fake_local_appdata(tmp_path, monkeypatch):
-    """Подменяет LOCALAPPDATA на временную папку.
-
-    Нужно, чтобы get_data_dir() не уходила в реальный
-    %LOCALAPPDATA% пользователя во время тестов.
-    """
-    local = tmp_path / "LocalAppData"
-    local.mkdir()
-    monkeypatch.setenv("LOCALAPPDATA", str(local))
-    return local
-
-
 # =========================================================
 # get_base_dir
 # =========================================================
@@ -89,9 +76,7 @@ class TestGetBaseDir:
         monkeypatch.setattr(sys, "frozen", False, raising=False)
 
         result = get_base_dir()
-        # Должен заканчиваться на Core_V3_0 (или как называется проект)
         assert os.path.isdir(result)
-        # Внутри должна быть папка utils
         assert os.path.isdir(os.path.join(result, "utils"))
 
 
@@ -99,20 +84,19 @@ class TestGetBaseDir:
 # СТАНДАРТНЫЕ ПАПКИ
 # =========================================================
 class TestStandardDirs:
-    def test_data_dir_created(self, fake_base, fake_local_appdata):
-        """get_data_dir() идёт в %LOCALAPPDATA%/Core_V3_0/data.
+    def test_data_dir_created(self, fake_base):
+        """get_data_dir() идёт в get_base_dir()/data (рядом с exe/проектом).
 
-        Новая логика: данные ревизора живут в LOCALAPPDATA,
-        а не в корне проекта — чтобы работать из Program Files.
+        Новая логика: данные лежат в папке программы, а не в
+        %LOCALAPPDATA% — чтобы не распылять файлы.
         """
         path = get_data_dir()
         assert os.path.isdir(path)
         assert path.endswith("data")
-        assert path.startswith(str(fake_local_appdata))
-        assert "Core_V3_0" in path
+        assert path == os.path.join(str(fake_base), "data")
 
     def test_data_dir_fallback(self, fake_base, monkeypatch):
-        """Без LOCALAPPDATA — fallback в корень проекта."""
+        """Без LOCALAPPDATA — всё равно get_base_dir()/data."""
         monkeypatch.delenv("LOCALAPPDATA", raising=False)
 
         path = get_data_dir()
@@ -144,7 +128,7 @@ class TestStandardDirs:
         assert os.path.isdir(path)
         assert path.endswith("temp")
 
-    def test_dirs_are_idempotent(self, fake_base, fake_local_appdata):
+    def test_dirs_are_idempotent(self, fake_base):
         """Повторный вызов не падает."""
         p1 = get_data_dir()
         p2 = get_data_dir()
@@ -184,7 +168,7 @@ class TestClearFolder:
         (folder / "file.txt").write_text("y")
 
         removed, failed = clear_folder(str(folder))
-        assert removed == 2  # sub + file.txt
+        assert removed == 2
         assert failed == 0
 
     def test_mixed_content(self, tmp_path):
@@ -216,7 +200,6 @@ class TestClearFolderLogging:
         folder.mkdir()
         (folder / "file.txt").write_text("a")
 
-        # Патчим os.remove, чтобы падало
         def broken_remove(path):
             raise PermissionError("test error")
 
@@ -234,7 +217,6 @@ class TestStyleExcel:
     def test_missing_file_no_error(self, tmp_path):
         """Несуществующий файл — не падаем."""
         from utils.file_utils import style_excel
-        # Не должно быть исключения
         style_excel(str(tmp_path / "nonexistent.xlsx"))
 
     def test_styles_xlsx(self, tmp_path):
@@ -250,10 +232,8 @@ class TestStyleExcel:
         from utils.file_utils import style_excel
         style_excel(str(path))
 
-        # Файл должен существовать и открываться
         assert os.path.isfile(path)
         from openpyxl import load_workbook
         wb = load_workbook(path)
         ws = wb.active
-        # Проверяем, что первая ячейка имеет жирный шрифт
         assert ws.cell(row=1, column=1).font.bold is True
