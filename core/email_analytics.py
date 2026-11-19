@@ -359,10 +359,22 @@ def summary(gm_code: Optional[str] = None, date_from: Optional[str] = None, date
     grand_total_no_rm = _extract_grand_total_no_rm(ref_email) if ref_email else 0.0
 
     return {
-        "emails_count": len(daily_emails),
+        # Финальных писем может быть 0 (архив старше сбора),
+        # но само письмо есть — считаем по всем найденным.
+        "emails_count": len(final_emails),
         "report_date": ref_email.get("report_date", "") if ref_email else "",
         "gm_code": ref_email.get("gm_code", "") if ref_email else "",
         "gm_name": ref_email.get("gm_name", "") if ref_email else "",
+        "start_date": ref_email.get("start_date", "") if ref_email else "",
+        "end_date": ref_email.get("end_date", "") if ref_email else "",
+        "duration_days": ref_email.get("duration_days") if ref_email else None,
+        "duration_text": (
+            ((ref_email.get("final_details") or {}).get("duration_text", ""))
+            if ref_email else ""
+        ),
+        "variant": ref_email.get("variant", "") if ref_email else "",
+        "final_totals": ref_email.get("final_totals", {}) if ref_email else {},
+        "final_details": ref_email.get("final_details", {}) if ref_email else {},
         "zones": zones,
         "other_events": others,
         "top_zones": _top_zones_from(zones),
@@ -371,7 +383,7 @@ def summary(gm_code: Optional[str] = None, date_from: Optional[str] = None, date
         "not_started": _not_started_from(email_with_events),
         "totals": {
             "grand_total": grand_total,
-            "grand_total_no_rm": grand_total_no_rm,  # <-- ДОБАВЛЕНО
+            "grand_total_no_rm": grand_total_no_rm,
         },
     }
 

@@ -797,12 +797,12 @@ class TestNotStarted:
 # =========================================================
 class TestSummary:
     def test_uses_last_for_total_daily_for_events(self, fake_emails):
-        """Итог — из финального. События — из последнего дневного.
+        """Итог и метаданные — из финального письма.
 
         Сценарий: 2 дневных + 1 финальное.
-        - emails_count = 2 (только дневные)
+        - emails_count = 1 (считаются финальные; дневные больше не собираются)
         - grand_total = 5000.0 (из финального)
-        - zones — из последнего дневного с events
+        - zones — из дневных, если они есть (для обратной совместимости)
         - report_date — из финального
         """
         fake_emails([
@@ -828,8 +828,8 @@ class TestSummary:
         # Итог — из финального
         assert result["totals"]["grand_total"] == 5000.0
 
-        # Счётчик — только дневные
-        assert result["emails_count"] == 2
+        # Счётчик — финальные письма (дневные больше не собираются)
+        assert result["emails_count"] == 1
 
         # Метаданные — из финального
         assert result["report_date"] == "05.10.2026"
@@ -838,8 +838,11 @@ class TestSummary:
         assert "Заморозка" in result["zones"]
         assert "Алкоголь" not in result["zones"]
 
-    def test_emails_count_only_daily(self, fake_emails):
-        """emails_count считает ТОЛЬКО дневные письма."""
+    def test_emails_count_only_final(self, fake_emails):
+        """emails_count считает ТОЛЬКО финальные письма.
+
+        Дневные письма больше не собираются (сбор идёт по финальным).
+        """
         fake_emails([
             _make_email(report_date="01.10.2026"),
             _make_email(report_date="02.10.2026"),
@@ -850,7 +853,7 @@ class TestSummary:
                 is_final=True,
             ),
         ])
-        assert ea.summary()["emails_count"] == 3
+        assert ea.summary()["emails_count"] == 1
 
     def test_empty(self, empty_emails):
         result = ea.summary()
