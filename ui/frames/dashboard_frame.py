@@ -293,13 +293,13 @@ class LineChart(QWidget):
 class HBar(QFrame):
     """Горизонтальный бар: подпись — полоса — значение."""
 
-    LABEL_WIDTH = 250
-    VALUE_WIDTH = 170
+    LABEL_WIDTH = 290
+    VALUE_WIDTH = 190
 
     def __init__(self, label, value, max_value, color=None,
                  value_text=None, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(28)
+        self.setFixedHeight(32)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
@@ -317,7 +317,9 @@ class HBar(QFrame):
         self._full_label = str(label)
         self._label = QLabel(self)
         self._label.setFixedWidth(self.LABEL_WIDTH)
-        self._label.setStyleSheet(f"color: {TEXT}; background: transparent;")
+        self._label.setStyleSheet(
+            f"color: {TEXT}; font-size: 14px; background: transparent;"
+        )
         self._label.setToolTip(self._full_label)
         lay.addWidget(self._label)
 
@@ -344,7 +346,7 @@ class HBar(QFrame):
         vlab = QLabel(txt)
         vlab.setFixedWidth(self.VALUE_WIDTH)
         vlab.setStyleSheet(
-            f"color: {TEXT}; font-family: Consolas; font-size: 12px; "
+            f"color: {TEXT}; font-family: Consolas; font-size: 14px; "
             f"background: transparent;"
         )
         vlab.setAlignment(
@@ -694,7 +696,7 @@ class DashboardFrame(BaseFrame):
         leg.setStyleSheet("QFrame { background: transparent; }")
         leg_lay = QVBoxLayout(leg)
         leg_lay.setContentsMargins(0, 0, 0, 0)
-        leg_lay.setSpacing(6)
+        leg_lay.setSpacing(10)
         leg_lay.addStretch()
 
         for name, total, deficit, surplus in zones:
@@ -703,14 +705,14 @@ class DashboardFrame(BaseFrame):
 
             dot = QLabel("●")
             dot.setStyleSheet(
-                f"color: {get_zone_color(name)}; font-size: 15px; "
+                f"color: {get_zone_color(name)}; font-size: 18px; "
                 f"background: transparent;"
             )
             entry.addWidget(dot)
 
             nm = QLabel(name)
             nm.setStyleSheet(
-                f"color: {TEXT}; font-size: 12px; background: transparent;"
+                f"color: {TEXT}; font-size: 15px; background: transparent;"
             )
             entry.addWidget(nm)
             entry.addStretch()
@@ -720,7 +722,7 @@ class DashboardFrame(BaseFrame):
                 f"{_fmt_money(total)}  {pct:.0f}%".replace(".0%", "%")
             )
             val.setStyleSheet(
-                f"color: {_type_color(total)}; font-size: 11px; "
+                f"color: {_type_color(total)}; font-size: 14px; "
                 f"font-family: Consolas; background: transparent;"
             )
             entry.addWidget(val)
