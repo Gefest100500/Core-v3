@@ -127,6 +127,23 @@ class AuditApp(QMainWindow):
             log.error(f"Ошибка создания BrakUtilAnalyzer: {e}")
 
     def _needs_sync(self) -> bool:
+        """Нужна ли синхронизация почты.
+
+        Проверяет не только давность, но и наличие файлов: если данные
+        удалили (например, при сборке через prepare_build.py), а флаг
+        синхронизации остался — сбор пропускался и архив был пустым.
+        """
+        # 1. Нет файла писем — собирать обязательно, что бы ни было в флаге
+        try:
+            from utils.file_utils import get_user_data_dir
+            emails_path = os.path.join(get_user_data_dir(), "emails", "emails.json")
+            if not os.path.exists(emails_path):
+                log.info("auto_fetch: файла писем нет — синхронизация нужна")
+                return True
+        except Exception as e:
+            log.debug(f"_needs_sync: не удалось проверить наличие писем: {e}")
+
+        # 2. Давность последней синхронизации
         try:
             last = self._settings.value(LAST_SYNC_KEY, "")
             if not last:
