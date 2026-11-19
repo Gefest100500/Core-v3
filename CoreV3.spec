@@ -48,6 +48,21 @@ for name in SPRAVOCHNIKI:
     if os.path.isfile(path):
         datas.append((path, "data"))
 
+# ---- win32timezone ------------------------------------------------------
+# Модуль лежит в site-packages/win32/lib и PyInstaller его не находит,
+# хотя он нужен для разбора дат писем Outlook. Без него fetch_emails
+# отбрасывает каждое письмо («No module named 'win32timezone'»).
+try:
+    import win32timezone as _w32tz
+    import shutil as _shutil
+    _tz_src = _w32tz.__file__
+    _tz_dir = os.path.join(BASE_DIR, "_build_tmp", "win32", "lib")
+    os.makedirs(_tz_dir, exist_ok=True)
+    _shutil.copy2(_tz_src, os.path.join(_tz_dir, "win32timezone.py"))
+    datas.append((_tz_dir, os.path.join("win32", "lib")))
+except Exception:
+    pass
+
 # ---- Нативные DLL pywv2 ------------------------------------------------
 # pywv2 при установке из pip держит proxy-layer DLL вне пакета, и
 # PyInstaller их не захватывает. Без них в собранной версии падает
@@ -70,6 +85,10 @@ hiddenimports = [
     "win32com.client",
     "pythoncom",
     "pywintypes",
+    # win32timezone нужен для парсинга дат писем Outlook.
+    # Без него fetch_emails отбрасывает КАЖДОЕ письмо:
+    # «No module named 'win32timezone'» -> писем 0.
+    "win32timezone",
 ]
 
 # Подмодули проекта, которые PyInstaller может не увидеть
