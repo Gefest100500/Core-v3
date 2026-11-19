@@ -20,8 +20,7 @@
     * add_to_archive -> {"created", "updated", "gm_code"}
     * get_emails_by_date_range(date_from, date_to, gm_code)
 """
-import os
-from datetime import datetime
+
 from typing import Any, Dict, List, Optional
 
 from utils.data_manager import (
@@ -30,7 +29,6 @@ from utils.data_manager import (
     get_data_manager,
 )
 from utils.logger import log
-
 
 # =========================================================
 # ВНУТРЕННИЕ УТИЛИТЫ
@@ -41,7 +39,6 @@ def make_key(gm_code: str, report_date: str) -> str:
     Разделитель '_' (как в старой версии) для совместимости с тестами.
     """
     return f"{gm_code}_{report_date}"
-
 
 def _find_index(
     emails: List[Dict[str, Any]],
@@ -60,7 +57,6 @@ def _find_index(
             return i
     return None
 
-
 # =========================================================
 # ЗАГРУЗКА
 # =========================================================
@@ -73,7 +69,6 @@ def load_emails() -> List[Dict[str, Any]]:
         return []
     return data
 
-
 def load_archive() -> List[Dict[str, Any]]:
     """Загружает архив завершённых инвентаризаций."""
     dm = get_data_manager()
@@ -82,7 +77,6 @@ def load_archive() -> List[Dict[str, Any]]:
         log.warning("load_archive: inventory_archive.json не список — возвращаю []")
         return []
     return data
-
 
 # =========================================================
 # СОХРАНЕНИЕ (поштучное — старая функция, оставлена для совместимости)
@@ -173,7 +167,6 @@ def save_email(
         "gm_code": gm_code,
         "key": key,
     }
-
 
 # =========================================================
 # БАТЧ-СОХРАНЕНИЕ (новая функция — для collect_emails)
@@ -277,7 +270,6 @@ def save_emails_batch(parsed_list: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     return stats
 
-
 # =========================================================
 # АРХИВ
 # =========================================================
@@ -335,7 +327,6 @@ def add_to_archive(parsed: Dict[str, Any]) -> Dict[str, Any]:
         "gm_code": gm_code,
     }
 
-
 # =========================================================
 # ПОИСК
 # =========================================================
@@ -345,12 +336,10 @@ def get_email(gm_code: str, report_date: str) -> Optional[Dict[str, Any]]:
     idx = _find_index(emails, gm_code, report_date)
     return emails[idx] if idx is not None else None
 
-
 def get_emails_by_gm(gm_code: str) -> List[Dict[str, Any]]:
     """Возвращает все письма для указанного ГМ."""
     emails = load_emails()
     return [e for e in emails if e.get("gm_code") == gm_code]
-
 
 def get_emails_by_date_range(
     date_from: str = "",
@@ -371,14 +360,12 @@ def get_emails_by_date_range(
         result.append(e)
     return result
 
-
 # =========================================================
 # СТАТИСТИКА
 # =========================================================
 def count_emails() -> int:
     """Возвращает количество писем."""
     return len(load_emails())
-
 
 def get_unique_gm_codes() -> List[str]:
     """Возвращает список уникальных кодов ГМ."""
@@ -389,7 +376,6 @@ def get_unique_gm_codes() -> List[str]:
         if gm:
             codes.add(gm)
     return sorted(codes)
-
 
 def clear_all():
     """Очищает все письма."""

@@ -3,8 +3,8 @@
 Диалоговое окно для отображения результатов комплексного теста подключений.
 Показывает чек-лист с иконками статусов (без прокрутки).
 """
-from PyQt6.QtCore import Qt, QSize, QPoint
-from PyQt6.QtGui import QFont, QMouseEvent
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton,
     QWidget, QSizePolicy
@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
 
 from ui.icons import get_icon_simple
 from ui.components.widgets import PrimaryButton
-
 
 class TestDialog(QDialog):
     def __init__(self, parent, colors, fonts, results):

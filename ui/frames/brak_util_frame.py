@@ -10,25 +10,23 @@
 """
 import os
 
-from PyQt6.QtCore import Qt, QStringListModel, QSize
+from PyQt6.QtCore import Qt, QStringListModel
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QScrollArea, QCompleter, QProgressBar, QPushButton,
     QFileDialog, QLineEdit
 )
 
-from config import FOLDERS
 from ui.frames.base_frame import BaseFrame
 from ui.components.widgets import (
     create_card, PrimaryButton, SecondaryButton, StyledEntry,
     style_popup, AnimatedPlaceholderEntry,
 )
-from ui.icons import get_icon_simple
+
 from utils.logger import log
 
 FILE1_KEYWORD = "выборочная проверка актов списания утиля"
 FILE2_KEYWORD = "операции списания"
-
 
 class BrakUtilFrame(BaseFrame):
 

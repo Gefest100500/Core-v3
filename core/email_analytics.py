@@ -9,8 +9,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.email_storage import load_emails
-from utils.logger import log
-
 
 ZONES_CANONICAL = [
     "Алкоголь", "Косметика и Бытовая химия", "Весовые конфеты",
@@ -34,7 +32,6 @@ ZONE_MAP = [
 
 _QUOTE_CHARS = ('"', '«', '»', "'", '`', '“', '”', '‘', '’')
 
-
 def _normalize_label_text(text: str) -> str:
     if not text:
         return ""
@@ -43,7 +40,6 @@ def _normalize_label_text(text: str) -> str:
         s = s.replace(q, '')
     s = " ".join(s.split())
     return s
-
 
 def extract_zone(label: str) -> Optional[str]:
     if not label:
@@ -57,7 +53,6 @@ def extract_zone(label: str) -> Optional[str]:
             return canonical
     return None
 
-
 ZONE_COLORS = [
     "#D42626", "#4CAF50", "#6366f1", "#FFD700", "#FF5252",
     "#00BCD4", "#9C27B0", "#FF9800", "#795548", "#607D8B",
@@ -65,13 +60,11 @@ ZONE_COLORS = [
     "#F44336", "#009688", "#673AB7", "#CDDC39", "#FF5722",
 ]
 
-
 def get_zone_color(zone_name: str) -> str:
     if not zone_name:
         return ZONE_COLORS[0]
     h = int(hashlib.md5(zone_name.encode("utf-8")).hexdigest(), 16)
     return ZONE_COLORS[h % len(ZONE_COLORS)]
-
 
 def _parse_ddmmyyyy(s: str) -> Optional[datetime]:
     if not s:
@@ -80,7 +73,6 @@ def _parse_ddmmyyyy(s: str) -> Optional[datetime]:
         return datetime.strptime(s, "%d.%m.%Y")
     except (ValueError, TypeError):
         return None
-
 
 def _date_in_range(d: str, date_from: Optional[str], date_to: Optional[str]) -> bool:
     dt = _parse_ddmmyyyy(d)
@@ -96,7 +88,6 @@ def _date_in_range(d: str, date_from: Optional[str], date_to: Optional[str]) -> 
             return False
     return True
 
-
 def short_label(label: str, max_len: int = 60) -> str:
     if not label:
         return ""
@@ -106,7 +97,6 @@ def short_label(label: str, max_len: int = 60) -> str:
     if len(s) > max_len:
         s = s[:max_len].rstrip() + "…"
     return s
-
 
 def _normalize_label(label: str, comment: str) -> str:
     if not label:
@@ -125,7 +115,6 @@ def _normalize_label(label: str, comment: str) -> str:
     if c.lower() == "перепроверка":
         return "Перепроверка расхождений"
     return "Перепроверка расхождений"
-
 
 def _extract_grand_total(email: Dict[str, Any]) -> float:
     if not email:
@@ -159,7 +148,6 @@ def _extract_grand_total(email: Dict[str, Any]) -> float:
     if "излиш" in typ:
         return -abs(amount)
     return amount
-
 
 # =========================================================
 # НОВАЯ ФУНКЦИЯ: сумма без РМ и МЦ
@@ -200,7 +188,6 @@ def _extract_grand_total_no_rm(email: Dict[str, Any]) -> float:
         return -abs(amount)
     return amount
 
-
 def get_filtered_emails(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[Dict[str, Any]]:
     emails = load_emails()
     result = []
@@ -213,26 +200,21 @@ def get_filtered_emails(gm_code: Optional[str] = None, date_from: Optional[str] 
     result.sort(key=lambda x: x.get("report_date", ""))
     return result
 
-
 def get_daily_emails(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[Dict[str, Any]]:
     emails = get_filtered_emails(gm_code, date_from, date_to)
     return [e for e in emails if not e.get("is_final")]
-
 
 def get_final_emails(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[Dict[str, Any]]:
     emails = get_filtered_emails(gm_code, date_from, date_to)
     return [e for e in emails if e.get("is_final")]
 
-
 def get_last_email(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> Optional[Dict[str, Any]]:
     emails = get_filtered_emails(gm_code, date_from, date_to)
     return emails[-1] if emails else None
 
-
 def get_last_daily_email(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> Optional[Dict[str, Any]]:
     emails = get_daily_emails(gm_code, date_from, date_to)
     return emails[-1] if emails else None
-
 
 def get_last_email_with_events(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> Optional[Dict[str, Any]]:
     emails = get_daily_emails(gm_code, date_from, date_to)
@@ -240,7 +222,6 @@ def get_last_email_with_events(gm_code: Optional[str] = None, date_from: Optiona
         if e.get("events"):
             return e
     return emails[-1] if emails else None
-
 
 def gm_list() -> List[Dict[str, str]]:
     emails = load_emails()
@@ -253,7 +234,6 @@ def gm_list() -> List[Dict[str, str]]:
     result = [{"code": code, "name": name, "display": f"{code} — {name}" if name else code} for code, name in seen.items()]
     result.sort(key=lambda x: x["name"].lower())
     return result
-
 
 def _split_events_from(email: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, Dict[str, float]]]:
     if not email:
@@ -280,7 +260,6 @@ def _split_events_from(email: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, D
         d["total"] = d["deficit"] - d["surplus"]
     return {"zones": zones, "other_events": others}
 
-
 def _top_zones_from(zones: Dict[str, Dict[str, float]]) -> List[Tuple[str, float, float, float]]:
     items = []
     for zone in ZONES_CANONICAL:
@@ -289,12 +268,10 @@ def _top_zones_from(zones: Dict[str, Dict[str, float]]) -> List[Tuple[str, float
     items.sort(key=lambda x: -abs(x[1]))
     return items
 
-
 def _top_other_from(others: Dict[str, Dict[str, float]], limit: int = 30) -> List[Tuple[str, float]]:
     items = [(k, d["total"]) for k, d in others.items()]
     items.sort(key=lambda x: -abs(x[1]))
     return items[:limit]
-
 
 def _time_from(email: Optional[Dict[str, Any]]) -> List[Tuple[str, float]]:
     if not email:
@@ -317,7 +294,6 @@ def _time_from(email: Optional[Dict[str, Any]]) -> List[Tuple[str, float]]:
             total[person] = total.get(person, 0.0) + hours
     return sorted(total.items(), key=lambda x: -x[1])
 
-
 def _not_started_from(email: Optional[Dict[str, Any]]) -> List[str]:
     if not email:
         return []
@@ -329,31 +305,25 @@ def _not_started_from(email: Optional[Dict[str, Any]]) -> List[str]:
                 s.add(short_label(label))
     return sorted(s)
 
-
 def split_events(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> Dict[str, Dict[str, Dict[str, float]]]:
     email = get_last_email_with_events(gm_code, date_from, date_to)
     return _split_events_from(email)
-
 
 def top_zones(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[Tuple[str, float, float, float]]:
     split = split_events(gm_code, date_from, date_to)
     return _top_zones_from(split["zones"])
 
-
 def top_other_events(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None, limit: int = 30) -> List[Tuple[str, float]]:
     split = split_events(gm_code, date_from, date_to)
     return _top_other_from(split["other_events"], limit=limit)
-
 
 def time_total(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[Tuple[str, float]]:
     email = get_last_email_with_events(gm_code, date_from, date_to)
     return _time_from(email)
 
-
 def not_started(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[str]:
     email = get_last_email_with_events(gm_code, date_from, date_to)
     return _not_started_from(email)
-
 
 def summary_history(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[Dict[str, Any]]:
     emails = get_daily_emails(gm_code, date_from, date_to)
@@ -369,7 +339,6 @@ def summary_history(gm_code: Optional[str] = None, date_from: Optional[str] = No
             "total": grand,
         })
     return points
-
 
 def summary(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> Dict[str, Any]:
     daily_emails = get_daily_emails(gm_code, date_from, date_to)
@@ -405,7 +374,6 @@ def summary(gm_code: Optional[str] = None, date_from: Optional[str] = None, date
             "grand_total_no_rm": grand_total_no_rm,  # <-- ДОБАВЛЕНО
         },
     }
-
 
 def summary_prev(gm_code: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> Optional[Dict[str, Any]]:
     emails = get_daily_emails(gm_code, date_from, date_to)

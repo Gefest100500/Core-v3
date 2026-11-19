@@ -3,7 +3,6 @@
 Отправка логов разработчику через Outlook.
 Чистая логика. Без PyQt. Тестируется отдельно.
 """
-import os
 import platform
 from datetime import datetime
 from pathlib import Path
@@ -21,7 +20,6 @@ except ImportError:
 # Настройки отправки
 LOG_EMAIL_TO = "silchenko_as@magnit.ru"  # ЗАМЕНИ НА СВОЮ ПОЧТУ
 LOG_SUBJECT_PREFIX = "Core V3.0 — Лог"
-
 
 def _get_log_file() -> Path:
     """Возвращает путь к текущему файлу лога."""
@@ -43,7 +41,6 @@ def _get_log_file() -> Path:
                 return p
                 
     return None
-
 
 def send_log_to_dev(extra_info: str = "") -> Dict[str, Any]:
     """
@@ -99,7 +96,6 @@ def send_log_to_dev(extra_info: str = "") -> Dict[str, Any]:
         log.error(f"log_sender: ошибка отправки: {e}")
 
     return result
-
 
 def should_auto_send(last_sent_iso: str) -> bool:
     """

@@ -9,10 +9,9 @@
   показывается при вводе (complete()).
 - Удалена кнопка "Поменять" и метод _swap_gms.
 """
-import os
 
 from PyQt6.QtCore import Qt, QStringListModel, QSettings, QSize
-from PyQt6.QtGui import QIcon
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QCompleter, QTextEdit, QLineEdit, QApplication, QPushButton
@@ -30,7 +29,6 @@ from core.gm_map import (
 )
 from utils.geo_utils import calculate_distance
 from utils.logger import log
-
 
 class DistanceFrame(BaseFrame):
 

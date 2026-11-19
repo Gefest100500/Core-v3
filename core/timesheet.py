@@ -21,12 +21,11 @@
 """
 import json
 import os
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
 from utils.file_utils import get_data_dir
 from utils.logger import log
-
 
 # =========================================================
 # ПУТЬ К ФАЙЛУ
@@ -34,7 +33,6 @@ from utils.logger import log
 def _timesheet_path() -> str:
     """Путь к timesheet.json в папке данных (%LOCALAPPDATA%)."""
     return os.path.join(get_data_dir(), "timesheet.json")
-
 
 # =========================================================
 # ЗАГРУЗКА / СОХРАНЕНИЕ
@@ -56,7 +54,6 @@ def load_timesheet() -> dict:
         log.error(f"Ошибка чтения timesheet.json: {e}")
         return {}
 
-
 def save_timesheet(data: dict) -> bool:
     """Сохраняет табель в JSON. Атомарно (tmp + replace)."""
     path = _timesheet_path()
@@ -73,7 +70,6 @@ def save_timesheet(data: dict) -> bool:
         log.exception(f"Ошибка записи timesheet.json: {e}")
         return False
 
-
 # =========================================================
 # РАБОТА С ДНЯМИ
 # =========================================================
@@ -81,23 +77,19 @@ def make_key(d: date) -> str:
     """Ключ дня: 'YYYY-MM-DD'."""
     return d.strftime("%Y-%m-%d")
 
-
 def get_day(data: dict, d: date) -> Optional[dict]:
     """Возвращает запись за день или None."""
     return data.get(make_key(d))
-
 
 def set_day(data: dict, d: date, k: int, d_val: int, n: int) -> dict:
     """Устанавливает значения за день. Возвращает обновлённый словарь."""
     data[make_key(d)] = {"k": int(k), "d": int(d_val), "n": int(n)}
     return data
 
-
 def clear_day(data: dict, d: date) -> dict:
     """Удаляет запись за день."""
     data.pop(make_key(d), None)
     return data
-
 
 # =========================================================
 # ФОРМАТ ДЛЯ АСУЗ
@@ -108,7 +100,6 @@ def format_for_asu(k: int, d: int, n: int) -> str:
     Всегда три части. Нули пишутся явно.
     """
     return f"К {int(k)} Д {int(d)} Н {int(n)}"
-
 
 def get_asu_string(data: dict, d: date) -> str:
     """Строка для АСУЗ за конкретный день.

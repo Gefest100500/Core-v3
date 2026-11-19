@@ -12,7 +12,7 @@
 - Увеличен шрифт в правой части.
 - В «О программе» добавлены калькулятор и блокнот.
 """
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QTabWidget, QTextBrowser, QApplication,
@@ -24,7 +24,7 @@ from ui.frames.base_frame import BaseFrame
 from ui.components.widgets import (
     create_card, SecondaryButton, style_tabview, StyledEntry
 )
-from ui.icons import get_icon, get_icon_simple
+from ui.icons import get_icon
 from utils.logger import log
 
 APP_VERSION = f"Core v{__version__}"
@@ -389,7 +389,6 @@ HTML_STYLE = """
     .section { border-left: 2px solid #333333; padding-left: 18px; margin-left: 5px; margin-bottom: 24px; }
 </style>
 """
-
 
 class InfoFrame(BaseFrame):
     TITLE = "Информация"

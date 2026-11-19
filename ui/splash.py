@@ -2,7 +2,7 @@
 """
 Заставка (SplashScreen) для Core V3.0.
 """
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QPoint
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QFont, QMouseEvent
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, 
@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
 )
 
 from ui.icons import get_icon_simple
-
 
 class SplashScreen(QWidget):
     """Заставка при старте приложения (во весь экран)."""

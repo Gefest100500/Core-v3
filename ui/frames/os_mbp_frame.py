@@ -11,7 +11,7 @@
 import os
 
 from PyQt6.QtCore import Qt, QSettings, QSize
-from PyQt6.QtGui import QIcon
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QProgressBar, QFileDialog, QCheckBox
@@ -24,10 +24,8 @@ from ui.components.widgets import (
 from ui.icons import get_icon_simple
 from utils.logger import log
 
-
 OS_FILE_KEYWORDS = ("более 100 тыс.", "менее 100 тыс.")
 MBP_FILE_KEYWORDS = ("забалансе", "по мбп")
-
 
 class OsMbpFrame(BaseFrame):
 

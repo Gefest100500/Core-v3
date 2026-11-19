@@ -7,11 +7,10 @@
 - Добавлен setObjectName для прогресс-бара.
 - В верхнюю панель добавлен виджет погоды (слева), приветствие выровнено по центру.
 """
-import os
 from datetime import datetime, date
 
 from PyQt6.QtCore import Qt, QTimer, QSize
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QScrollArea, QProgressBar, QListWidget, QListWidgetItem,
@@ -26,7 +25,6 @@ from ui.components.dialogs import ask_confirm
 from ui.components.weather_widget import WeatherWidget
 from ui.icons import get_icon_simple
 from utils.logger import log
-
 
 # --- Русские дни недели и месяцы ---
 WEEKDAYS_RU = {
@@ -58,7 +56,6 @@ EMOJI_TO_ICON = {
     "📁": "gm",
     "🏠": "home",
 }
-
 
 class HomeFrame(BaseFrame):
 

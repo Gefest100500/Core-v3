@@ -12,7 +12,7 @@
   Анимация стартует в showEvent (когда виджет точно в event loop).
 """
 from PyQt6.QtCore import Qt, QTimer, QSize
-from PyQt6.QtGui import QPainter, QColor, QIcon
+from PyQt6.QtGui import QPainter, QColor
 from PyQt6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QComboBox, QCompleter, QDateEdit, QTabWidget,
@@ -95,7 +95,6 @@ QCalendarWidget QWidget#qt_calendar_calendarview {
 }
 """
 
-
 def style_popup(widget):
     """Красит popup любого виджета в единый тёмный стиль."""
     popup = None
@@ -112,7 +111,6 @@ def style_popup(widget):
 
     popup.setStyleSheet(POPUP_QSS)
     return True
-
 
 # =========================================================
 # СОВМЕСТИМОСТЬ С ОРИГИНАЛОМ
@@ -136,7 +134,6 @@ def create_card(master, bg="#222222", border="#333333",
 
     return card
 
-
 def create_title(master, text, font, text_color="#E0E0E0", pady=(25, 12)):
     """Заголовок с отступами сверху и снизу."""
     wrapper = QFrame(master)
@@ -152,7 +149,6 @@ def create_title(master, text, font, text_color="#E0E0E0", pady=(25, 12)):
 
     layout.addWidget(label)
     return wrapper
-
 
 def style_tabview(tabview, card="#222222", sidebar="#2A2A2A",
                   button="#D42626", hover="#B71C1C",
@@ -186,7 +182,6 @@ def style_tabview(tabview, card="#222222", sidebar="#2A2A2A",
         }}
     """)
 
-
 # =========================================================
 # НОВЫЕ УДОБНЫЕ ФУНКЦИИ
 # =========================================================
@@ -197,14 +192,12 @@ def SectionTitle(text, parent=None):
     label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
     return label
 
-
 def InfoLabel(text, parent=None):
     """Мелкая серая подпись."""
     label = QLabel(text, parent)
     label.setObjectName("InfoLabel")
     label.setStyleSheet("color: #A0A0A0;")
     return label
-
 
 def PrimaryButton(text, on_click=None, parent=None, icon_name=None):
     """Основная кнопка (красная)."""
@@ -221,7 +214,6 @@ def PrimaryButton(text, on_click=None, parent=None, icon_name=None):
     if on_click:
         btn.clicked.connect(lambda: on_click())
     return btn
-
 
 def SecondaryButton(text, on_click=None, parent=None, icon_name=None, icon_color="#E0E0E0"):
     """Вторичная кнопка (серая). Поддерживает иконки без наездов."""
@@ -255,7 +247,6 @@ def SecondaryButton(text, on_click=None, parent=None, icon_name=None, icon_color
         btn.clicked.connect(lambda: on_click())
     return btn
 
-
 def StyledEntry(placeholder="", parent=None):
     """Поле ввода в тёмном стиле."""
     entry = QLineEdit(parent)
@@ -276,7 +267,6 @@ def StyledEntry(placeholder="", parent=None):
         }
     """)
     return entry
-
 
 # =========================================================
 # АНИМИРОВАННЫЙ ПЛЕЙСХОЛДЕР
@@ -443,7 +433,6 @@ class AnimatedPlaceholderEntry(QLineEdit):
             self._start()
         self.update()
 
-
 def StyledCombo(items=None, parent=None):
     """Выпадающий список в тёмном стиле."""
     combo = QComboBox(parent)
@@ -474,7 +463,6 @@ def StyledCombo(items=None, parent=None):
     style_popup(combo)
     return combo
 
-
 def Row(*widgets, spacing=10, parent=None):
     """Горизонтальный ряд виджетов."""
     row = QFrame(parent)
@@ -485,7 +473,6 @@ def Row(*widgets, spacing=10, parent=None):
     for w in widgets:
         layout.addWidget(w)
     return row
-
 
 def VStack(*widgets, spacing=10, parent=None):
     """Вертикальный стек виджетов."""

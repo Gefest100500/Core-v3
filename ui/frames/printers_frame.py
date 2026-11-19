@@ -6,10 +6,9 @@
 - Добавлена кнопка «Назад» (возврат в меню «Утилиты»).
 - Плейсхолдеры приведены к единому виду (с большой буквы).
 """
-import os
 
 from PyQt6.QtCore import Qt, QSettings, QSize
-from PyQt6.QtGui import QAction, QColor, QIcon
+from PyQt6.QtGui import QAction, QColor
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QTabWidget, QListWidget, QListWidgetItem, QInputDialog,
@@ -21,11 +20,10 @@ from ui.components.widgets import (
     create_card, StyledEntry, PrimaryButton, SecondaryButton, style_tabview,
     AnimatedPlaceholderEntry
 )
-from ui.components.dialogs import ask_confirm
+
 from ui.icons import get_icon_simple
 from utils.logger import log
 from utils.network_utils import normalize_ip, is_valid_ip
-
 
 def _com_initialize():
     try:
@@ -41,7 +39,6 @@ def _com_initialize():
         log.debug(f"CoInitialize failed: {e}")
         return False
 
-
 def _com_uninitialize(initialized):
     if not initialized:
         return
@@ -50,7 +47,6 @@ def _com_uninitialize(initialized):
         pythoncom.CoUninitialize()
     except Exception:
         pass
-
 
 class PrintersFrame(BaseFrame):
 

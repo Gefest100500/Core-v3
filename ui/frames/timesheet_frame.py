@@ -27,19 +27,17 @@ from PyQt6.QtWidgets import (
 
 from ui.frames.base_frame import BaseFrame
 from ui.icons import get_icon_simple
-from utils.logger import log
+
 from core.timesheet import (
     load_timesheet, save_timesheet, get_day, set_day,
     format_for_asu,
 )
-
 
 WEEKDAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 MONTHS_RU = [
     "", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
     "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
 ]
-
 
 class TimesheetFrame(BaseFrame):
 

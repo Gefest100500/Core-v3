@@ -3,20 +3,16 @@
 Мини-калькулятор в стиле Core.
 """
 import ctypes
-from PyQt6.QtCore import Qt, QSize, QEvent, QObject
+from PyQt6.QtCore import Qt, QEvent, QObject
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLineEdit, QPushButton, QWidget
 )
-
-from ui.icons import get_icon_simple
-
 
 # =========================================================
 # ТЁМНАЯ ШАПКА (скопировано из main.py)
 # =========================================================
 DWMWA_USE_IMMERSIVE_DARK_MODE = 20
 DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19
-
 
 def _apply_dark_title_bar(widget):
     try:
@@ -34,7 +30,6 @@ def _apply_dark_title_bar(widget):
     except Exception:
         pass
 
-
 class _DarkTitleBarFilter(QObject):
     def __init__(self, widget, parent=None):
         super().__init__(parent)
@@ -49,13 +44,11 @@ class _DarkTitleBarFilter(QObject):
             _apply_dark_title_bar(self._widget)
         return super().eventFilter(obj, event)
 
-
 def _install_dark_title_bar(widget):
     _apply_dark_title_bar(widget)
     flt = _DarkTitleBarFilter(widget)
     widget.installEventFilter(flt)
     widget._dark_title_filter = flt
-
 
 class CalculatorDialog(QDialog):
     def __init__(self, parent=None, colors=None):

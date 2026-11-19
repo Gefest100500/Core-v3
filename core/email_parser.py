@@ -31,9 +31,8 @@
 - Для финального письма report_date берётся из end_date.
 """
 import re
-from datetime import datetime
-from typing import Any, Dict, List, Optional
 
+from typing import Any, Dict, List, Optional
 
 # =========================================================
 # КОНСТАНТЫ
@@ -46,7 +45,6 @@ SECTION_COMMENTS = "Дополнительный комментарий"
 NOT_STARTED = "Не приступали"
 YES_MARK = "Да"
 NO_MARK = "Нет"
-
 
 # =========================================================
 # РЕГУЛЯРКИ
@@ -165,7 +163,6 @@ RE_TIME_LOG = re.compile(
 # Дата в конце строки
 RE_DATE_AT_END = re.compile(r"(\d{2}\.\d{2}\.\d{4})\s*$")
 
-
 # =========================================================
 # ПАРСИНГ ЧИСЛА
 # =========================================================
@@ -181,7 +178,6 @@ def _parse_amount(raw: str) -> Optional[float]:
         return float(s)
     except (ValueError, TypeError):
         return None
-
 
 # =========================================================
 # ПАРСИНГ ШАПКИ
@@ -206,7 +202,6 @@ def _parse_executors(lines: List[str]) -> List[Dict[str, str]]:
         })
 
     return result
-
 
 def _parse_gm_header(text: str) -> Dict[str, str]:
     """Ищет строку с ГМ. Поддерживает два формата писем:
@@ -242,7 +237,6 @@ def _parse_gm_header(text: str) -> Dict[str, str]:
 
     return {}
 
-
 def _parse_dates(text: str) -> Dict[str, str]:
     """Парсит даты начала/окончания инвентаризации из шапки письма."""
     result = {"start_date": "", "end_date": ""}
@@ -256,7 +250,6 @@ def _parse_dates(text: str) -> Dict[str, str]:
         result["end_date"] = m.group("date").strip()
 
     return result
-
 
 def _parse_duration_variant(text: str) -> Dict[str, Any]:
     """Парсит 'Длительность интенсивного пересчета товара: 4 суток (Вариант Е)'."""
@@ -272,7 +265,6 @@ def _parse_duration_variant(text: str) -> Dict[str, Any]:
 
     return result
 
-
 def _parse_author(text: str) -> Dict[str, str]:
     """Ищет 'Отчет отправил(a) ФИО дата'."""
     m = RE_AUTHOR.search(text)
@@ -282,7 +274,6 @@ def _parse_author(text: str) -> Dict[str, str]:
         "author": m.group("name").strip(),
         "author_date": m.group("date").strip(),
     }
-
 
 # =========================================================
 # ПАРСИНГ ИТОГОВ
@@ -323,7 +314,6 @@ def _parse_totals(text: str) -> Dict[str, Any]:
 
     return result
 
-
 def _parse_final_totals(text: str) -> Dict[str, Any]:
     """Парсит финальные строки:
         «Сумма полной инвентаризации c РМ и МЦ: ...»
@@ -359,7 +349,6 @@ def _parse_final_totals(text: str) -> Dict[str, Any]:
             }
 
     return result
-
 
 # =========================================================
 # ПАРСИНГ СОБЫТИЙ
@@ -410,7 +399,6 @@ def _parse_events_block(lines: List[str]) -> List[Dict[str, Any]]:
 
     return events
 
-
 # =========================================================
 # ПАРСИНГ УЧЁТА ВРЕМЕНИ
 # =========================================================
@@ -445,7 +433,6 @@ def _parse_time_log(lines: List[str]) -> List[Dict[str, Any]]:
         })
 
     return result
-
 
 # =========================================================
 # ПАРСИНГ КОММЕНТАРИЕВ
@@ -500,7 +487,6 @@ def _parse_comments(lines: List[str]) -> List[Dict[str, str]]:
         })
 
     return result
-
 
 # =========================================================
 # ОСНОВНАЯ ФУНКЦИЯ
@@ -677,7 +663,6 @@ def parse_email_body(body: str, subject: str = "") -> Dict[str, Any]:
         "comments": comments,
         "parse_warnings": warnings,
     }
-
 
 # =========================================================
 # ВСПОМОГАТЕЛЬНОЕ — ИТОГ ПО ВСЕМ ДНЯМ

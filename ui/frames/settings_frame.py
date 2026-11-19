@@ -15,12 +15,11 @@ from ui.components.widgets import (
     create_card, PrimaryButton, SecondaryButton, StyledCombo,
     AnimatedPlaceholderEntry
 )
-from ui.icons import get_icon_simple
+
 from ui.components.test_dialog import TestDialog
 from utils.logger import log
 from core.terminal_helper import xor_encrypt, get_password_key
 from core.log_sender import send_log_to_dev, should_auto_send
-
 
 class SettingsFrame(BaseFrame):
     TITLE = "Настройки"

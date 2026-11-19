@@ -3,7 +3,7 @@
 Мастер первого запуска Core V3.0.
 """
 import os
-from PyQt6.QtCore import Qt, QSettings, QPoint
+from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton,
@@ -14,7 +14,6 @@ from ui.icons import get_icon_simple
 from ui.components.widgets import StyledCombo
 from utils.logger import log
 from core.terminal_helper import xor_encrypt, get_password_key
-
 
 class WizardDialog(QDialog):
     def __init__(self, parent, colors, fonts):

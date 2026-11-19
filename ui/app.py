@@ -9,7 +9,7 @@ from PyQt6.QtCore import (
     Qt, QTimer, QSettings, QSize, QPropertyAnimation, QEasingCurve,
     pyqtSignal
 )
-from PyQt6.QtGui import QFont, QIcon
+
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QStackedWidget, QFrame, QSizePolicy, QApplication,
@@ -37,7 +37,6 @@ LAST_SYNC_KEY = "emails_last_sync"
 ICON_SIZE = 22
 ICON_LEFT_MARGIN = 21
 ICON_CENTER_OFFSET = 2
-
 
 class AuditApp(QMainWindow):
 

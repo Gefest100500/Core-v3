@@ -14,7 +14,6 @@
 - подсветка поиска — жёлтым фоном поверх текста (а не только курсором);
 - встроенный CSS документа собирается из палитры Core.
 """
-import os
 from collections import OrderedDict
 
 from PyQt6.QtCore import Qt, QUrl, QSettings
@@ -42,7 +41,6 @@ SPLITTER_WIDTH = 2
 TREE_PADDING = 8
 ITEM_PADDING = 8
 BORDER_RADIUS = 8
-
 
 def build_document_css(colors: dict, fonts: dict) -> str:
     """CSS для QTextBrowser, собранный из палитры и шрифтов Core.
@@ -83,7 +81,6 @@ def build_document_css(colors: dict, fonts: dict) -> str:
     .caption {{ color: {text_dim}; font-size: 9pt; margin: 4px 0 12px 0; }}
     """
 
-
 class GuideTextBrowser(QTextBrowser):
     """QTextBrowser без рамки: рамку и фон задаёт вкладка."""
 
@@ -93,7 +90,6 @@ class GuideTextBrowser(QTextBrowser):
         self.viewport().setAutoFillBackground(False)
         self.setOpenLinks(False)
         self.setOpenExternalLinks(False)
-
 
 class GuideTab(BaseFrame):
     TITLE = "Регламент"

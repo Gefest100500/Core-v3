@@ -17,8 +17,8 @@
   Они открывают те же фреймы, что раньше были в сайдбаре.
 - Добавлена карточка «ТСД (QR-коды)».
 """
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QKeySequence, QShortcut, QIcon
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QScrollArea, QPushButton
@@ -26,7 +26,6 @@ from PyQt6.QtWidgets import (
 
 from ui.frames.base_frame import BaseFrame
 from ui.icons import get_icon_simple
-
 
 class ToolCard(QFrame):
     """Карточка одной утилиты.
@@ -159,7 +158,6 @@ class ToolCard(QFrame):
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self.tab_name)
         super().mousePressEvent(event)
-
 
 class UtilsFrame(BaseFrame):
 

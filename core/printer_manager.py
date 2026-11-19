@@ -5,7 +5,6 @@ import subprocess
 import json
 import os
 import tempfile
-import re
 import time
 
 from utils.logger import log
@@ -13,7 +12,6 @@ from utils.network_utils import (
     normalize_ip, is_valid_ip, check_host,
     scan_printer_ports, preferred_driver_for_port_type,
 )
-
 
 class PrinterManager:
     def __init__(self):
@@ -88,7 +86,6 @@ class PrinterManager:
             return "Готов"
 
         return ", ".join(problems)
-
 
     # =========================================================
     # 2. Запуск PowerShell

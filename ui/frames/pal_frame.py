@@ -11,7 +11,7 @@ import os
 import re
 
 from PyQt6.QtCore import Qt, QSettings, QSize
-from PyQt6.QtGui import QIcon
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QProgressBar, QFileDialog
@@ -24,10 +24,8 @@ from ui.components.widgets import (
 from ui.icons import get_icon_simple
 from utils.logger import log
 
-
 EXCEL_EXTENSIONS = (".xlsx", ".xls")
 PALLET_NAME_RE = re.compile(r"^\d{6}$")
-
 
 class PalFrame(BaseFrame):
 

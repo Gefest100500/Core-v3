@@ -153,7 +153,7 @@ Desktop-приложение для автоматизации аудита ро
 - Если поле ГМ пустое — показывается подсказка «Выберите ГМ».
 - Если по ГМ нет писем — «Нет данных по этому ГМ».
 
-Бизнес-логика дашборда «Общий пересчёт» вынесена в `core/dashboard_builder.py` (история действий, активная инвентаризация, архив, результаты квантов, сводки). Отдельно от UI — тестируется без PyQt.
+Бизнес-логика дашборда «Общий пересчёт» вынесена в  (история действий, активная инвентаризация, архив, результаты квантов, сводки). Отдельно от UI — тестируется без PyQt.
 
 ### Интеграция с Outlook
 
@@ -374,14 +374,9 @@ Desktop-приложение для автоматизации аудита ро
 %LOCALAPPDATA%\Core_V3_0\data\
 ```
 
-Это нужно, чтобы программа работала из `Program Files` и не теряла данные при обновлении. Миграция старой `data/` из корня проекта выполняется один раз при первом запуске:
+Это нужно, чтобы программа работала из `Program Files` и не теряла данные при обновлении. Автоматической миграции нет: папка `data/` создаётся рядом с `.exe` при первом запуске.
 
-- `utils/data_migration.py` — логика миграции;
-- флаг `.migrated` в `%LOCALAPPDATA%\Core_V3_0\` — защита от повторного запуска;
-- только копирование, оригинал в корне не удаляется;
-- существующие файлы в целевой папке не перезаписываются.
-
-Путь к данным возвращает `utils/file_utils.get_data_dir()`. Все модули (`core/timesheet.py`, `core/dashboard_builder.py`, `email_storage`, `DataManager` и т.д.) обязаны использовать его, а не хардкодить `<корень>/data`.
+Путь к данным возвращает `utils/file_utils.get_data_dir()`. Все модули (`core/timesheet.py`, , `email_storage`, `DataManager` и т.д.) обязаны использовать его, а не хардкодить `<корень>/data`.
 
 Начиная с этой версии, `standard_comments.json` также читается из `%LOCALAPPDATA%\Core_V3_0\data\` через `DataManager` (`STANDARD_COMMENTS_PATH`), а не из корня проекта.
 
@@ -415,7 +410,7 @@ py -3.13 -m pytest tests/test_parsing.py::TestToFloatRu::test_russian_decimal -v
 | Область | Файлы |
 |---------|-------|
 | Парсинг и форматирование | `test_parsing.py`, `test_formatting.py` |
-| DataManager и данные | `test_data_manager.py`, `test_data_manager_extra.py`, `test_data_manager_run.py`, `test_data_dir.py`, `test_data_migration.py`, `test_file_utils_run.py` |
+| DataManager и данные | `test_data_manager.py`, `test_data_manager_extra.py`, `test_data_manager_run.py`, `test_data_dir.py`, `test_file_utils_run.py` |
 | Комментарии | `test_comments_builder.py` |
 | Кванты | `test_kv_analyzer.py`, `test_kv_analyzer_run.py` |
 | Брак/Утиль | `test_brak_util_analyzer.py`, `test_brak_util_analyzer_run.py` |
@@ -644,10 +639,6 @@ ImportError: `Import xlrd` failed. Install xlrd >= 2.0.1 for xls Excel support
 - Права доступа — если Outlook запускается от имени другого пользователя, COM может не подключиться.
 
 Если письма лежат в Exchange, но Outlook локально не настроен — сбор не сработает. В этом случае нужно использовать другой способ (например, `exchangelib` для Exchange Web Services), но это уже за рамками текущей реализации.
-
-### 8. `data/` в корне — только legacy
-
-После переноса данных в `%LOCALAPPDATA%\Core_V3_0\data\` папка `data/` в корне проекта — legacy. Её подхватывает `utils/data_migration.py` при первом запуске и копирует в новое место. После успешной миграции (есть флаг `.migrated`) старую `data/` можно удалить вручную. Программа без неё работает.
 
 ---
 

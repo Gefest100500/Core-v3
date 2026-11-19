@@ -31,7 +31,7 @@ from datetime import datetime
 from PyQt6.QtCore import (
     Qt, QMimeData, QUrl, QSize, QTimer, QFileInfo, pyqtSignal
 )
-from PyQt6.QtGui import QFont, QDrag, QIcon, QPixmap
+from PyQt6.QtGui import QFont, QDrag
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QApplication, QTreeWidget, QTreeWidgetItem,
@@ -43,13 +43,11 @@ from config import FOLDERS
 from ui.icons import get_icon_simple
 from utils.logger import log
 
-
 # =========================================================
 # ТЁМНАЯ СИСТЕМНАЯ ШАПКА
 # =========================================================
 DWMWA_USE_IMMERSIVE_DARK_MODE = 20
 DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19
-
 
 def _apply_dark_title_bar(widget):
     if sys.platform != "win32":
@@ -73,7 +71,6 @@ def _apply_dark_title_bar(widget):
     except Exception as e:
         log.debug(f"files_dialog: не удалось применить тёмную шапку: {e}")
 
-
 # =========================================================
 # ФОРМАТИРОВАНИЕ
 # =========================================================
@@ -91,13 +88,11 @@ def _format_size(size_bytes: int) -> str:
         size /= 1024.0
     return f"{size:.1f} ТБ"
 
-
 def _format_mtime(mtime: float) -> str:
     try:
         return datetime.fromtimestamp(mtime).strftime("%d.%m.%Y %H:%M")
     except Exception:
         return "—"
-
 
 def _file_icon_name(name: str) -> str:
     lower = name.lower()
@@ -110,7 +105,6 @@ def _file_icon_name(name: str) -> str:
     if lower.endswith((".zip", ".7z", ".rar")):
         return "archive"
     return "file"
-
 
 # =========================================================
 # ДИАЛОГ
@@ -607,7 +601,6 @@ class FilesDialog(QDialog):
             parts.append(f"ошибок {failed}")
         if parts:
             self.status_label.setText(", ".join(parts).capitalize())
-
 
 # =========================================================
 # СПИСОК ФАЙЛОВ С DRAG-OUT В ПРОВОДНИК

@@ -8,7 +8,7 @@ import subprocess
 from datetime import datetime
 
 from PyQt6.QtCore import Qt, QStringListModel, QSettings, QSize, QTimer
-from PyQt6.QtGui import QIcon, QMouseEvent
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QScrollArea, QCompleter, QPushButton, QLineEdit
@@ -23,14 +23,12 @@ from ui.components.widgets import (
 from ui.icons import get_icon_simple
 from utils.logger import log
 
-
 GM_REQUIRED_KEYS = ("Код", "Название", "Папка")
 MAX_SHORTCUT_NAME_LEN = 100
 PI_SUBFOLDERS = ["1 сутки", "2 сутки", "3 сутки", "4 сутки", "Итоговые"]
 
 BASE_DIR = get_base_dir()
 GM_DATA_PATH = os.path.join(BASE_DIR, "data", "gm_data.json")
-
 
 class GmFrame(BaseFrame):
 

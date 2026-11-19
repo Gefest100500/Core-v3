@@ -30,13 +30,11 @@
 - Логирование: на уровне debug пишем, какие папки обошли и сколько
   писем в каждой; на уровне info — итог.
 """
-import os
 import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils.logger import log
-
 
 OUTLOOK_AVAILABLE = False
 try:
@@ -44,7 +42,6 @@ try:
     OUTLOOK_AVAILABLE = True
 except ImportError:
     log.info("outlook_connector: win32com не установлен — интеграция отключена")
-
 
 SENDER_FILTER = "Krs_gk_gm_otchet@magnit.ru"
 SUBJECT_FILTERS = [
@@ -60,7 +57,6 @@ PR_SMTP_ADDRESS = "http://schemas.microsoft.com/mapi/proptags/0x39FE001E"
 # Максимальная глубина рекурсии по папкам.
 # 10 — с запасом: у большинства пользователей структура не глубже 3–4.
 MAX_FOLDER_DEPTH = 10
-
 
 # =========================================================
 # УТИЛИТЫ
@@ -83,7 +79,6 @@ def _get_smtp_address(item) -> str:
 
     return ""
 
-
 def _get_sender_variants(item) -> List[str]:
     """Все варианты отправителя."""
     variants = []
@@ -101,7 +96,6 @@ def _get_sender_variants(item) -> List[str]:
     if smtp:
         variants.append(smtp)
     return variants
-
 
 def _walk_folders(folder, depth=0, max_depth=MAX_FOLDER_DEPTH):
     """Рекурсивный обход папок.
@@ -127,7 +121,6 @@ def _walk_folders(folder, depth=0, max_depth=MAX_FOLDER_DEPTH):
             continue
         yield from _walk_folders(sub, depth + 1, max_depth)
 
-
 def _iter_root_folders(namespace):
     """Итерирует все корневые папки ящика (включая Inbox, KRS GM, Архив, .pst)."""
     try:
@@ -144,7 +137,6 @@ def _iter_root_folders(namespace):
             yield roots.Item(i)
         except Exception as e:
             log.debug(f"fetch_emails: не удалось открыть корневую папку #{i}: {e}")
-
 
 # =========================================================
 # ГЛАВНАЯ ФУНКЦИЯ
@@ -337,16 +329,13 @@ def fetch_emails(
             except Exception:
                 pass
 
-
 def extract_report_date(subject: str) -> str:
     m = re.search(r"(\d{2}\.\d{2}\.\d{4})", subject)
     return m.group(1) if m else ""
 
-
 def extract_gm_name(subject: str) -> str:
     m = re.search(r"ГМ\s+(.+?)\s*[—\-]\s*\d{2}\.\d{2}\.\d{4}", subject)
     return m.group(1).strip() if m else ""
-
 
 def is_outlook_available() -> bool:
     return OUTLOOK_AVAILABLE

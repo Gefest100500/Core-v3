@@ -19,14 +19,12 @@
 from typing import Any, Callable, Dict, List, Optional
 
 from core.email_parser import parse_email_body
-from core.email_storage import save_emails_batch, load_emails, load_archive
+from core.email_storage import save_emails_batch, load_emails
 from core.outlook_connector import fetch_emails, is_outlook_available, outlook_installed
 from utils.logger import log
 
-
 # Сколько дней брать, если настройка не задана или испорчена.
 DEFAULT_KEEP_DAYS = 30
-
 
 # =========================================================
 # СБОР
@@ -159,7 +157,6 @@ def collect_emails(
 
     return result
 
-
 # =========================================================
 # СТАТИСТИКА
 # =========================================================
@@ -177,7 +174,6 @@ def storage_stats() -> Dict[str, Any]:
 # ГЛУБИНА ПОИСКА ИЗ НАСТРОЕК
 # =========================================================
 ALL_MAILBOX = "all"
-
 
 def days_back_from_settings(settings=None) -> Optional[int]:
     """Переводит значение мастера настроек в days_back для fetch_emails.

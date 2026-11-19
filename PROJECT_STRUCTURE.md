@@ -29,7 +29,7 @@
     │   │   │                       AnimatedPlaceholderEntry, style_popup
     │   │   ├── dialogs.py          CustomMessageBox, ask_confirm
     │   │   ├── calculator_dialog.py Мини-калькулятор (тёмная шапка)
-    │   │   └── notepad_dialog.py   Блокнот (сохранение в %LOCALAPPDATA%/Core_V3_0/notes/,
+    │   │   └── notepad_dialog.py   Блокнот (заметки в data/notes/,
     │   │                           кнопки «Новая», «Удалить», кастомное подтверждение)
     │   │
     │   └── frames/                 Вкладки (по одной на модуль)
@@ -48,11 +48,8 @@
     │       ├── distance_frame.py   Расстояние между ГМ
     │       ├── terminal_frame.py   Терминал (mstsc)
     │       ├── tsd_frame.py        ТСД (QR-коды)
-    │       ├── web_frame.py        Web (pywv2 / WebView2, вкладка АСУС)
     │       ├── dashboard_frame.py  Дашборд отчётов из Outlook
     │       ├── archive_frame.py    Архив инвентаризаций
-    │       ├── ai_frame.py         AI — «Стажёр» (разметка Shadow Engine)
-    │       ├── violations_frame.py Нарушения (Трассировщик)
     │       ├── info_frame.py       Информация
     │       └── utils_frame.py      Меню утилит
     │
@@ -61,13 +58,12 @@
     │   ├── os_mbp_analyzer.py      Парсер инвентаризационных описей
     │   ├── brak_util_analyzer.py   Сверка Брак/Утиль
     │   ├── pal_analyzer.py         Сборка паллет
-    │   ├── violations_analyzer.py  Нарушения (Трассировщик)
     │   ├── comments_builder.py     Логика шаблонов комментариев
     │   ├── printer_manager.py      Управление принтерами
     │   ├── gm_map.py               Координаты ГМ, геокодинг
+    │   ├── guide_manager.py        Загрузка, рендер и поиск по регламенту
     │   ├── inventory_helper.py     Помощник инвентаризации
     │   ├── timesheet.py            Логика табеля (load/save, формат АСУЗ)
-    │   ├── dashboard_builder.py    Сбор данных для дашборда «Общий пересчёт»
     │   ├── terminal_helper.py      Хелпер для Терминала (mstsc)
     │   ├── email_parser.py         Парсер писем Outlook
     │   ├── email_storage.py        Хранилище писем (через DataManager)
@@ -77,7 +73,6 @@
     │
     ├── ml/                         Shadow Engine (без PyQt)
     │   ├── shadow.py               Генерация гипотез по правилам
-    │   ├── features.py             Признаки строки для ML
     │   ├── feedback.py             Разметка «Согласен / Не согласен»
     │   ├── storage.py              SQLite-хранилище (гипотезы, feedback)
     │   ├── config.py               Настройки ML (пути, параметры)
@@ -86,16 +81,14 @@
     ├── utils/                      Утилиты (без PyQt)
     │   ├── logger.py               Логирование с ротацией
     │   ├── file_utils.py           Пути (get_data_dir и др.), clear_folder
-    │   ├── data_migration.py       Одноразовая миграция data/ в %LOCALAPPDATA%
     │   ├── data_manager.py         JSON-хранилище с кэшем и очередью записи
     │   ├── parsing.py              Парсинг чисел, номеров, поиск столбцов
     │   ├── formatting.py           Форматирование сумм и процентов
     │   ├── excel_utils.py          autofit_columns, safe_filename
     │   ├── network_utils.py        IP, ping, порты принтеров
     │   ├── geo_utils.py            Расчёт расстояний (haversine)
-    │   └── machine_info.py         Информация о машине
     │
-    ├── tests/                      Тесты (pytest, 730+ passed)
+    ├── tests/                      Тесты (pytest, 725 passed)
     │   ├── conftest.py             Общие фикстуры
     │   ├── test_parsing.py
     │   ├── test_formatting.py
@@ -103,7 +96,6 @@
     │   ├── test_data_manager_extra.py
     │   ├── test_data_manager_run.py
     │   ├── test_data_dir.py
-    │   ├── test_data_migration.py
     │   ├── test_file_utils_run.py
     │   ├── test_comments_builder.py
     │   ├── test_kv_analyzer.py
@@ -116,7 +108,6 @@
     │   ├── test_email_storage_run.py
     │   ├── test_os_mbp_analyzer.py
     │   ├── test_pal_analyzer.py
-    │   ├── test_violations_analyzer.py
     │   ├── test_timesheet.py
     │   ├── test_terminal_helper.py
     │   ├── test_inventory_helper.py
@@ -132,21 +123,15 @@
     ├── Logs/                       Логи (создаётся автоматически)
     └── temp/                       Временные файлы (создаётся автоматически)
 
-## Данные (%LOCALAPPDATA%)
+## Данные (data/ рядом с .exe)
 
-Данные ревизора **не** лежат в корне проекта. Они живут в:
+Данные лежат в папке `data/` рядом с `.exe` (при разработке — рядом с
+`main.py`). Путь возвращает `utils/file_utils.get_user_data_dir()`,
+папка создаётся при первом запуске. Автоматической миграции нет.
 
-    %LOCALAPPDATA%\Core_V3_0\data\
-
-Это нужно, чтобы программа работала из Program Files и не теряла
-данные при обновлении. Миграция старой `data/` из корня проекта
-выполняется один раз при первом запуске (`utils/data_migration.py`,
-флаг `.migrated`).
-
-Содержимое `%LOCALAPPDATA%\Core_V3_0\data\`:
+Содержимое `data/`:
 
     data/
-    ├── .migrated                   Флаг: миграция выполнена
     ├── gm_data.json                Справочник магазинов
     ├── gm_ip.json                  IP-адреса ГМ
     ├── gm_cities_cache.json        Кэш координат городов
@@ -172,14 +157,11 @@
     │   ├── shadow.sqlite           SQLite: гипотезы и feedback
     │   ├── exports/                Экспорт feedback (JSONL)
     │   └── models/                 Модели ML
-    └── webengine/
-        └── asus/                   Профиль WebView2 (pywv2): АСУС
+    └── weather_profile/            Профиль WebView2 для запроса погоды
 
-> Каталоги `webengine/help/` и `webengine/trip/` в текущей версии
-> **не используются**: вкладки «Командировка» и «Help» убраны из Web.
-> Их URL остаются в `config.json` как зарезервированные — при
-> необходимости вкладки можно вернуть тем же механизмом
-> `ShowWindow`/`HideWindow`, что и АСУС.
+> Профиль WebView2 используется только виджетом погоды на Главной:
+> запрос к wttr.in идёт через Chromium и проходит там, где httpx
+> наружу не пробивается.
 
 ## Слои приложения
 
@@ -187,13 +169,12 @@
 - `core/` — бизнес-логика. Не зависит от PyQt, тестируется отдельно.
 - `ml/` — Shadow Engine. Не зависит от PyQt, тестируется отдельно.
 - `utils/` — утилиты. Не зависит от PyQt, полностью тестируемо.
-- `data/` — данные в JSON, в `%LOCALAPPDATA%`. Меняются без правки кода.
+- `data/` — данные в JSON, рядом с `.exe`. Меняются без правки кода.
 
 ## Технологии
 
 - Python 3.13
 - PyQt6 (интерфейс)
-- pywv2 (WebView2) — вкладка «АСУС»
 - pandas, openpyxl (обработка Excel)
 - qrcode[pil] (QR-коды, вкладка ТСД)
 - Shadow Engine на SQLite (разметка, feedback)
