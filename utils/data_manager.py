@@ -32,6 +32,7 @@ BUNDLED_FILES = [
     "distance_history.json",
     "steal_codes.json",
     "user_settings.json",
+    "guide.json",
 ]
 
 HISTORY_PATH = DATA_DIR / "actions_history.json"
@@ -41,6 +42,7 @@ GM_DATA_PATH = DATA_DIR / "gm_data.json"
 INVENTORY_PLANS_PATH = DATA_DIR / "inventory_plans.json"
 GM_NOTES_PATH = DATA_DIR / "gm_notes.json"
 STANDARD_COMMENTS_PATH = DATA_DIR / "standard_comments.json"
+GUIDE_PATH = DATA_DIR / "guide.json"
 
 EMAILS_DIR = DATA_DIR / "emails"
 EMAILS_PATH = EMAILS_DIR / "emails.json"
@@ -270,6 +272,32 @@ class DataManager:
         except queue.Full:
             log.warning("Очередь записи переполнена: emails")
         return len(new_emails)
+
+    # =========================================================
+    # GUIDE.JSON (регламент инвентаризации)
+    # =========================================================
+    def get_guide(self):
+        """Читает guide.json. Возвращает dict или None."""
+        return self._read_file("guide", GUIDE_PATH)
+
+    def set_guide(self, data):
+        """Атомарно пишет guide.json (через очередь записи)."""
+        self._write_async("guide", GUIDE_PATH, data)
+
+    def reload_guide(self):
+        """Сбрасывает кэш guide.json — следующий get_guide() перечитает файл.
+
+        Полезно после ручной правки guide.json пользователем.
+        """
+        if "guide" in self._cache:
+            self._cache["guide"] = (self._cache["guide"][0], None)
+        else:
+            self._cache["guide"] = (None, None)
+        log.info("Кэш guide.json сброшен")
+
+    def guide_exists(self):
+        """Быстрая проверка: есть ли guide.json на диске."""
+        return GUIDE_PATH.exists()
 
     def read_json_async(self, name, path, callback):
         def _bg_read():

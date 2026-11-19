@@ -20,7 +20,7 @@ from config import get_config, get_fonts
 from utils.logger import log
 from utils.data_manager import get_data_manager
 from ui.icons import get_icon, get_icon_simple
-from ui.styles import build_qss
+from ui.styles import build_qss, build_dark_palette
 
 SIDEBAR_WIDTH_COLLAPSED = 64
 SIDEBAR_WIDTH_EXPANDED = 260
@@ -149,7 +149,7 @@ class AuditApp(QMainWindow):
         self._splash = splash
 
         preload_names = [
-            "inventory", "archive", "utils", "ai",
+            "inventory", "archive", "utils",
             "timesheet", "terminal", "settings",
         ]
         self._init_total = len(preload_names) + 1
@@ -216,7 +216,7 @@ class AuditApp(QMainWindow):
 
         def _worker():
             try:
-                from core.email_service import collect_emails
+                from core.email_service import collect_emails, days_back_from_settings
                 from core.outlook_connector import outlook_ready
 
                 ready, reason = outlook_ready(timeout=20)
@@ -225,7 +225,7 @@ class AuditApp(QMainWindow):
                     self.outlook_unavailable.emit(reason)
                     return
 
-                result = collect_emails(days_back=None)
+                result = collect_emails(days_back=days_back_from_settings(self._settings))
                 log.info(
                     f"auto_fetch: fetched={result.get('fetched')}, "
                     f"saved={result.get('saved')}, "
@@ -341,17 +341,16 @@ class AuditApp(QMainWindow):
             ("inventory", "Инвентаризация"),
             ("utils", "Утилиты"),
             ("terminal", "Терминал"),
-            ("globe", "АСУС"),
             ("dashboard", "Дашборд"),
-            ("ai", "AI"),
             ("archive", "Архив"),
             ("timesheet", "Табель"),
+            ("guide", "Регламент"),
             ("settings", "Настройки"),
             ("info", "Информация"),
         ]
 
         for key, label_text in buttons:
-            tab_name = "web" if key == "globe" else key
+            tab_name = key
             icon_name = "chart" if key == "dashboard" else key
             if key == "settings":
                 icon_name = "settings"
@@ -477,6 +476,13 @@ class AuditApp(QMainWindow):
         dialog.exec()
 
     def _apply_style(self):
+        # Fusion рисует виджеты по палитре целиком; стиль Windows часть
+        # элементов берёт из системы и игнорирует QPalette.
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyle("Fusion")
+            app.setPalette(build_dark_palette(self.COLORS))
+
         qss = build_qss(self.COLORS)
         self.setStyleSheet(qss)
 
@@ -549,13 +555,9 @@ class AuditApp(QMainWindow):
         self.sidebar.leaveEvent = self._on_sidebar_leave
 
     def _on_sidebar_enter(self, event):
-        if self.current_tab_name == "web":
-            return
         self._expand_sidebar()
 
     def _on_sidebar_leave(self, event):
-        if self.current_tab_name == "web":
-            return
         self._collapse_timer.start()
 
     def show_tab(self, name):
@@ -596,10 +598,6 @@ class AuditApp(QMainWindow):
         self.current_tab_name = name
         self.set_status("Готов")
 
-        if name == "web":
-            self._apply_sidebar_state(collapsed=True)
-            self._animate_sidebar(SIDEBAR_WIDTH_COLLAPSED)
-
         try:
             if hasattr(frame, "refresh"):
                 frame.refresh()
@@ -614,10 +612,6 @@ class AuditApp(QMainWindow):
         if name == "dashboard":
             from ui.frames.dashboard_frame import DashboardFrame
             return DashboardFrame(self, name)
-
-        if name == "ai":
-            from ui.frames.ai_frame import AIFrame
-            return AIFrame(self, name)
 
         if name == "comments":
             from ui.frames.comments_frame import CommentsFrame
@@ -643,10 +637,6 @@ class AuditApp(QMainWindow):
             from ui.frames.gm_frame import GmFrame
             return GmFrame(self, name)
 
-        if name == "web":
-            from ui.frames.web_frame import WebFrame
-            return WebFrame(self, name)
-
         if name == "archive":
             from ui.frames.archive_frame import ArchiveFrame
             return ArchiveFrame(self, name)
@@ -654,6 +644,10 @@ class AuditApp(QMainWindow):
         if name == "timesheet":
             from ui.frames.timesheet_frame import TimesheetFrame
             return TimesheetFrame(self, name)
+
+        if name == "guide":
+            from ui.frames.guide_tab import GuideTab
+            return GuideTab(self, name)
 
         if name == "settings":
             from ui.frames.settings_frame import SettingsFrame
@@ -682,10 +676,6 @@ class AuditApp(QMainWindow):
         if name == "distance":
             from ui.frames.distance_frame import DistanceFrame
             return DistanceFrame(self, name)
-
-        if name == "violations":
-            from ui.frames.violations_frame import ViolationsFrame
-            return ViolationsFrame(self, name)
 
         if name == "tsd":
             from ui.frames.tsd_frame import TsdFrame

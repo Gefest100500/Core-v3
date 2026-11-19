@@ -75,7 +75,8 @@ class PrintersFrame(BaseFrame):
         self._settings = QSettings("SilchenkoAleksey", "CoreV3")
 
         self._setup_ui()
-        self._restore_last_ip()
+        # Поле IP при открытии вкладки всегда пустое: значение из прошлой
+        # сессии не восстанавливаем — вкладка должна начинаться с нуля.
 
         self._do_scan()
 
@@ -770,5 +771,28 @@ class PrintersFrame(BaseFrame):
     # REFRESH
     # =========================================================
     def refresh(self):
+        """При входе на вкладку — поиск и поле IP пусты, вкладка первая."""
+        try:
+            if self.entry_search.text():
+                self.entry_search.blockSignals(True)
+                self.entry_search.clear()
+                self.entry_search.blockSignals(False)
+                self._apply_filter("")
+        except Exception:
+            pass
+
+        try:
+            if self.entry_ip.text():
+                self.entry_ip.blockSignals(True)
+                self.entry_ip.clear()
+                self.entry_ip.blockSignals(False)
+        except Exception:
+            pass
+
+        try:
+            self.tabs.setCurrentIndex(0)
+        except Exception:
+            pass
+
         if not self.all_installed:
             self._do_scan()

@@ -326,4 +326,8 @@ class BrakUtilFrame(BaseFrame):
         self.btn_run.setEnabled(True)
 
     def refresh(self):
-        pass
+        """При входе на вкладку — поле ГМ пустое."""
+        try:
+            self.gm_entry.clear()
+        except Exception:
+            pass

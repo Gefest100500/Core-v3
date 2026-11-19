@@ -24,6 +24,10 @@ from core.outlook_connector import fetch_emails, is_outlook_available, outlook_i
 from utils.logger import log
 
 
+# Сколько дней брать, если настройка не задана или испорчена.
+DEFAULT_KEEP_DAYS = 30
+
+
 # =========================================================
 # СБОР
 # =========================================================
@@ -168,3 +172,57 @@ def storage_stats() -> Dict[str, Any]:
         "total": len(emails),
         "gms": gm_list(),
     }
+
+# =========================================================
+# ГЛУБИНА ПОИСКА ИЗ НАСТРОЕК
+# =========================================================
+ALL_MAILBOX = "all"
+
+
+def days_back_from_settings(settings=None) -> Optional[int]:
+    """Переводит значение мастера настроек в days_back для fetch_emails.
+
+    Мастер (WizardDialog) пишет в QSettings строку:
+        "7" | "14" | "30" | "all"
+    где "all" — весь ящик.
+
+    Возвращает:
+        int  — ограничение по дням
+        None — весь ящик (без фильтра по дате)
+
+    Если настройка отсутствует или испорчена — возвращает DEFAULT_DAYS_BACK,
+    чтобы не тянуть весь ящик по случайности.
+    """
+    try:
+        if settings is None:
+            from PyQt6.QtCore import QSettings
+            settings = QSettings("SilchenkoAleksey", "CoreV3")
+
+        raw = settings.value("email_days_back", "")
+    except Exception as e:
+        log.warning(f"days_back_from_settings: не удалось прочитать настройку: {e}")
+        return DEFAULT_KEEP_DAYS
+
+    if raw is None or str(raw).strip() == "":
+        log.info("days_back_from_settings: настройка не задана — берём 30 дней")
+        return DEFAULT_KEEP_DAYS
+
+    text = str(raw).strip().lower()
+
+    if text == ALL_MAILBOX:
+        log.info("days_back_from_settings: выбран весь ящик")
+        return None
+
+    try:
+        days = int(text)
+    except (TypeError, ValueError):
+        log.warning(f"days_back_from_settings: непонятное значение «{raw}» — берём 30 дней")
+        return DEFAULT_KEEP_DAYS
+
+    if days <= 0:
+        log.warning(f"days_back_from_settings: недопустимое значение {days} — берём 30 дней")
+        return DEFAULT_KEEP_DAYS
+
+    log.info(f"days_back_from_settings: {days} дней")
+    return days
+

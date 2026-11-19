@@ -43,7 +43,6 @@ EMOJI_TO_ICON = {
     "📦": "os_mbp",
     "📊": "kv",
     "🛢": "brak_util",
-    "⚠️": "violations",
     "📝": "comments",
     "📏": "distance",
     "📁": "gm",

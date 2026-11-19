@@ -9,7 +9,7 @@
 - safe_filename — очистка имени от запрещённых символов
 
 Раньше эти функции дублировались в 5 анализаторах (kv, pal, os_mbp,
-brak_util, violations). Теперь — одна точка правды.
+brak_util). Теперь — одна точка правды.
 """
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter

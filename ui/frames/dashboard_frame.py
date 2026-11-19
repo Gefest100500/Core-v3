@@ -1221,7 +1221,8 @@ class DashboardFrame(BaseFrame):
 
     def _collect_in_bg(self):
         try:
-            result = collect_emails(days_back=None)
+            from core.email_service import days_back_from_settings
+            result = collect_emails(days_back=days_back_from_settings())
             self.run_on_ui(self._on_collect_done, result)
         except Exception as e:
             log.exception("Ошибка collect_emails")
@@ -1257,4 +1258,12 @@ class DashboardFrame(BaseFrame):
         self.show_error("Ошибка сбора", err)
 
     def refresh(self):
+        """При входе на вкладку — поле поиска пустое."""
+        try:
+            if self.entry.text():
+                self.entry.blockSignals(True)
+                self.entry.clear()
+                self.entry.blockSignals(False)
+        except Exception:
+            pass
         self._refresh_all()

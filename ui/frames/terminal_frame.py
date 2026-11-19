@@ -310,5 +310,10 @@ class TerminalFrame(BaseFrame):
             self.status_label.setStyleSheet(f"color: {color};")
 
     def refresh(self):
+        """При входе на вкладку — поле ГМ пустое, как при первом открытии."""
+        try:
+            self.entry_gm.clear()
+        except Exception:
+            pass
         self._gm_data = self._load_gm_data()
         self._attach_completer(self._gm_data)

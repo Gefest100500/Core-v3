@@ -147,3 +147,45 @@ def get_coords_by_city(city: str):
     else:
         print(f"[GEO] Нет координат для города {city}")
     return coords
+
+# Город по умолчанию, если локацию не удалось определить по IP.
+# Можно переопределить в config.json:  "weather": { "default_city": "Москва" }
+DEFAULT_CITY = "москва"
+
+
+def get_default_city() -> str:
+    """Город по умолчанию из config.json, иначе DEFAULT_CITY."""
+    try:
+        from config import get_config
+        cfg = get_config()
+        configured = (cfg.CONFIG.get("weather") or {}).get("default_city", "")
+        if configured and str(configured).strip():
+            return str(configured).strip().lower()
+    except Exception as e:
+        log.debug(f"get_default_city: не удалось прочитать config.json: {e}")
+
+    return DEFAULT_CITY
+
+
+def resolve_location():
+    """Определяет локацию: сначала по IP, потом — город по умолчанию.
+
+    Возвращает кортеж (city_display, (lat, lon), is_fallback).
+    city_display — с заглавной буквы, для показа в интерфейсе.
+    Если не нашлось даже координат города по умолчанию — (None, None, True).
+    """
+    ip = get_local_ip()
+    code = find_gm_by_ip(ip) if ip else ""
+    city = get_city_by_gm_code(code) if code else ""
+
+    coords = get_coords_by_city(city) if city else None
+    if coords:
+        return city.capitalize(), coords, False
+
+    fallback_city = get_default_city()
+    coords = get_coords_by_city(fallback_city)
+    if coords:
+        log.info(f"[GEO] Локация не определена по IP, используем {fallback_city}")
+        return fallback_city.capitalize(), coords, True
+
+    return None, None, True

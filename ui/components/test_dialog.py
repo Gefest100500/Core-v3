@@ -1,13 +1,13 @@
 # ui/components/test_dialog.py
 """
 Диалоговое окно для отображения результатов комплексного теста подключений.
-Показывает чек-лист с иконками статусов.
+Показывает чек-лист с иконками статусов (без прокрутки).
 """
 from PyQt6.QtCore import Qt, QSize, QPoint
 from PyQt6.QtGui import QFont, QMouseEvent
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton,
-    QScrollArea, QWidget, QSizePolicy
+    QWidget, QSizePolicy
 )
 
 from ui.icons import get_icon_simple
@@ -33,7 +33,6 @@ class TestDialog(QDialog):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        self.resize(500, 450)
         self.setModal(True)
         self._setup_ui()
         
@@ -103,38 +102,9 @@ class TestDialog(QDialog):
         # --- КОНТЕНТ ---
         content_layout = QVBoxLayout()
         content_layout.setContentsMargins(20, 15, 20, 0)
-        
-        # Скролл для списка (если проверок будет много)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet("QScrollArea { background: transparent; }")
-        
-        # Скрываем некрасивый скроллбар
-        scroll.verticalScrollBar().setStyleSheet("""
-            QScrollBar:vertical {
-                border: none;
-                background: transparent;
-                width: 6px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: #555555;
-                min-height: 20px;
-                border-radius: 3px;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-        """)
+        content_layout.setSpacing(8)
 
-        scroll_content = QWidget()
-        scroll_content.setStyleSheet("background: transparent;")
-        scroll_content_layout = QVBoxLayout(scroll_content)
-        scroll_content_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_content_layout.setSpacing(8)
-
-        # Рисуем каждый пункт
+        # Рисуем каждый пункт (без прокрутки)
         for item in self.results:
             row = QFrame()
             row.setStyleSheet(f"""
@@ -181,11 +151,7 @@ class TestDialog(QDialog):
             text_layout.addWidget(msg_lbl)
 
             row_layout.addLayout(text_layout, 1)
-            scroll_content_layout.addWidget(row)
-
-        scroll_content_layout.addStretch()
-        scroll.setWidget(scroll_content)
-        content_layout.addWidget(scroll, 1)
+            content_layout.addWidget(row)
 
         # Кнопка "Закрыть" внизу
         btn_row = QHBoxLayout()
@@ -198,6 +164,9 @@ class TestDialog(QDialog):
         content_layout.addLayout(btn_row)
         
         layout.addLayout(content_layout)
+
+        # Подгоняем окно под содержимое (без прокрутки)
+        self.adjustSize()
 
     # --- Перетаскивание окна за шапку ---
     def mousePressEvent(self, event: QMouseEvent):

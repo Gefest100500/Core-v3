@@ -12,11 +12,29 @@
     "border": "#333333"
   },
   "fonts": {
-    "title": ["Segoe UI", 20, "bold"],
-    "subtitle": ["Segoe UI", 15, "bold"],
-    "label": ["Segoe UI", 13],
-    "small": ["Segoe UI", 11],
-    "status": ["Consolas", 12, "bold"]
+    "title": [
+      "Segoe UI",
+      20,
+      "bold"
+    ],
+    "subtitle": [
+      "Segoe UI",
+      15,
+      "bold"
+    ],
+    "label": [
+      "Segoe UI",
+      13
+    ],
+    "small": [
+      "Segoe UI",
+      11
+    ],
+    "status": [
+      "Consolas",
+      12,
+      "bold"
+    ]
   },
   "loss_threshold": 1000,
   "box_deviation_pct": 50,
@@ -31,5 +49,8 @@
     "trip_home": "https://magnittravel.ru/Start",
     "help_url": "https://help.corp.tander.ru/dwp/app/#/catalog",
     "help_home": "https://help.corp.tander.ru/dwp/app/#/catalog"
+  },
+  "weather": {
+    "default_city": "Москва"
   }
 }

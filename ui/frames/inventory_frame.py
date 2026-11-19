@@ -1045,6 +1045,11 @@ class InventoryFrame(BaseFrame):
     # REFRESH
     # =========================================================
     def refresh(self):
+        """При входе на вкладку — поле ГМ пустое, прокрутка в начало."""
+        try:
+            self.gm_input.clear()
+        except Exception:
+            pass
         self._load_all_from_cache()
         self._render_inventory()
         self._rebuild_checklist_view()

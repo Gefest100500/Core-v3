@@ -52,7 +52,6 @@ EMOJI_TO_ICON = {
     "🧩": "pal",
     "📦": "os_mbp",
     "📊": "kv",
-    "⚠️": "violations",
     "✅": "check",
     "🔄": "refresh",
     "🗑": "trash",

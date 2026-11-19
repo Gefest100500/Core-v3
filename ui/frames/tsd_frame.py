@@ -191,9 +191,11 @@ class TsdFrame(BaseFrame):
         self._completer = completer
 
         def _on_activated(text):
-            # ВАЖНО: используем QTimer, чтобы AnimatedPlaceholderEntry успел завершить свои дела
-            clean_text = text.split(" — ", 1)[1] if " — " in text else text
-            QTimer.singleShot(0, lambda: self.entry_gm.setText(clean_text))
+            # ВАЖНО: используем QTimer, чтобы AnimatedPlaceholderEntry успел завершить свои дела.
+            # Строка выглядит как "996404 — Саратов": в поле должен попасть КОД (часть [0]),
+            # а не название. Из-за [1] в поле оставалось имя и валидация требовала цифры.
+            clean_text = text.split(" — ", 1)[0] if " — " in text else text
+            QTimer.singleShot(0, lambda: self.entry_gm.setText(clean_text.strip()))
 
         self._completer_activated = _on_activated
         completer.activated.connect(_on_activated)

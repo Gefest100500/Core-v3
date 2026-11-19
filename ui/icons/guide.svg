@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+     viewBox="0 0 24 24" fill="none" stroke="currentColor"
+     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Лист регламента со сложенным верхним углом -->
+  <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/>
+  <path d="M14 3v5h5"/>
+  <!-- Пункты списка -->
+  <path d="M9 12.5h6"/>
+  <path d="M9 16h6"/>
+  <!-- Галочка-отметка слева от первой строки -->
+  <path d="M7.2 6.4l1.2 1.2 2-2.2"/>
+</svg>

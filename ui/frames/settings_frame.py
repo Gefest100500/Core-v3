@@ -157,7 +157,7 @@ class SettingsFrame(BaseFrame):
         btn_row_diag = QHBoxLayout()
         btn_row_diag.setSpacing(10)
         
-        btn_test = PrimaryButton("Тест подключений", on_click=self._run_test, parent=card_diag)
+        btn_test = PrimaryButton("Тест системы", on_click=self._run_test, parent=card_diag)
         btn_test.setFixedWidth(200)
         btn_test.setMinimumHeight(40)
         btn_row_diag.addWidget(btn_test)
@@ -212,6 +212,63 @@ class SettingsFrame(BaseFrame):
             self._settings.setValue("reports_folder", folder)
             log.info(f"Папка для отчетов изменена: {folder}")
 
+    def _check_references(self):
+        """Проверяет наличие всех .json в папке данных."""
+        try:
+            from utils.file_utils import get_data_dir
+            data_dir = get_data_dir()
+        except Exception as e:
+            return {
+                "title": "Справочники (json)",
+                "status": "info",
+                "message": f"Не удалось определить папку данных: {e}"
+            }
+
+        if not os.path.isdir(data_dir):
+            return {
+                "title": "Справочники (json)",
+                "status": "error",
+                "message": f"Папка данных не найдена: {data_dir}"
+            }
+
+        try:
+            json_files = sorted(
+                name for name in os.listdir(data_dir)
+                if name.lower().endswith(".json")
+                and os.path.isfile(os.path.join(data_dir, name))
+            )
+        except (OSError, PermissionError) as e:
+            return {
+                "title": "Справочники (json)",
+                "status": "error",
+                "message": f"Не удалось прочитать папку данных: {e}"
+            }
+
+        if not json_files:
+            return {
+                "title": "Справочники (json)",
+                "status": "error",
+                "message": "Справочники не найдены (нет ни одного .json)"
+            }
+
+        missing = [
+            name for name in json_files
+            if not os.path.isfile(os.path.join(data_dir, name))
+        ]
+
+        if missing:
+            return {
+                "title": "Справочники (json)",
+                "status": "error",
+                "message": f"Недоступны: {', '.join(missing)}"
+            }
+
+        return {
+            "title": "Справочники (json)",
+            "status": "success",
+            "message": "Все справочники доступны"
+        }
+
     def _run_test(self):
         results = []
         
@@ -250,6 +307,9 @@ class SettingsFrame(BaseFrame):
                 results.append({"title": "Корпоративная почта", "status": "error", "message": f"Нет доступа к ящику: {str(e)[:50]}"})
         else:
             results.append({"title": "Корпоративная почта", "status": "info", "message": "Пропущено (Outlook не запущен)"})
+
+        # Проверка справочников (json)
+        results.append(self._check_references())
 
         dialog = TestDialog(self, self.COLORS, self.FONTS, results)
         dialog.exec()

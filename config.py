@@ -50,6 +50,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "brak_util": {
         "tolerance": 1.0,
     },
+    "weather": {
+        "default_city": "Москва",
+    },
     "external": {
         "asus_url": "https://rao.corp.tander.ru/",
         "asus_home": "https://rao.corp.tander.ru/",
@@ -145,7 +148,6 @@ class Config:
             "pal": os.path.join(self.OUTPUT_FOLDER, "Паллеты"),
             "os_mbp": os.path.join(self.OUTPUT_FOLDER, "ОС_МБП"),
             "brak_util": os.path.join(self.OUTPUT_FOLDER, "Брак_утиль"),
-            "violations": os.path.join(self.OUTPUT_FOLDER, "Нарушения"),
             "pivot": os.path.join(self.OUTPUT_FOLDER, "Сводные"),
             "info": self.OUTPUT_FOLDER,
             "temp": self.TEMP_DIR,
