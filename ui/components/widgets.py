@@ -1,6 +1,6 @@
 # ui/components/widgets.py
 """
-Общие виджеты для Core V3.0.
+Общие виджеты для Core V3.1.
 
 ИЗМЕНЕНИЯ:
 - SecondaryButton теперь поддерживает иконки (icon_name).

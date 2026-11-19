@@ -106,3 +106,12 @@ $RECYCLE.BIN/
 test_max.py
 _test_*.py
 check_*.py
+
+# =========================================================
+# Сборка (PyInstaller + Inno Setup)
+# =========================================================
+build/
+dist/
+*.spec.bak
+installer/Output/
+Output/

@@ -1,6 +1,6 @@
 # ui/components/wizard_dialog.py
 """
-Мастер первого запуска Core V3.0.
+Мастер первого запуска Core V3.1.
 """
 import os
 from PyQt6.QtCore import Qt, QSettings
@@ -172,7 +172,7 @@ class WizardDialog(QDialog):
         icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon_lbl)
         
-        title = QLabel("Добро пожаловать в Core V3.0!")
+        title = QLabel("Добро пожаловать в Core V3.1!")
         title.setFont(self.fonts['title'])
         title.setStyleSheet(f"color: {self.colors.get('text', '#E0E0E0')};")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)

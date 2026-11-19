@@ -1,6 +1,6 @@
 # main.py
 """
-Core V3.0 — Корпоративный аудит.
+Core V3.1 — Корпоративный аудит.
 """
 import sys
 import ctypes
@@ -80,7 +80,7 @@ def main():
     app = None
     try:
         app = QApplication(sys.argv)
-        app.setApplicationName("Core V3.0")
+        app.setApplicationName("Core V3.1")
         app.setOrganizationName("Silchenko Aleksey")
     except Exception as e:
         _show_startup_error(None, "Ошибка запуска", f"Не удалось создать QApplication:\n{e}", traceback.format_exc())

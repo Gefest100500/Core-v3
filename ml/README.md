@@ -1,4 +1,4 @@
-# ML-модуль Core V3.0 — Shadow Engine v0.3
+# ML-модуль Core V3.1 — Shadow Engine v0.3
 
 > «Стажёр, который учится думать как правила»
 

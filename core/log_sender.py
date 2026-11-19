@@ -19,7 +19,7 @@ except ImportError:
 
 # Настройки отправки
 LOG_EMAIL_TO = "silchenko_as@magnit.ru"  # ЗАМЕНИ НА СВОЮ ПОЧТУ
-LOG_SUBJECT_PREFIX = "Core V3.0 — Лог"
+LOG_SUBJECT_PREFIX = "Core V3.1 — Лог"
 
 def _get_log_file() -> Path:
     """Возвращает путь к текущему файлу лога."""

@@ -1,6 +1,6 @@
 # ui/app.py
 """
-Главное окно Core V3.0.
+Главное окно Core V3.1.
 """
 import os
 from datetime import datetime, timedelta
@@ -50,7 +50,7 @@ class AuditApp(QMainWindow):
         self._outlook_warned = False
         self._outlook_warning_text = ""
         self._init_finished = False
-        self.setWindowTitle("Core V3.0 - Корпоративный аудит")
+        self.setWindowTitle("Core V3.1 - Корпоративный аудит")
         self.resize(1400, 900)
         self.setMinimumSize(1100, 700)
 

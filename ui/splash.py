@@ -1,6 +1,6 @@
 # ui/splash.py
 """
-Заставка (SplashScreen) для Core V3.0.
+Заставка (SplashScreen) для Core V3.1.
 """
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QFont, QMouseEvent

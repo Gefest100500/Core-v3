@@ -1,6 +1,6 @@
 # ui/components/files_dialog.py
 """
-Внутренний файловый менеджер Core V3.0.
+Внутренний файловый менеджер Core V3.1.
 
 Открывается вместо проводника Windows при нажатии
 «Открыть результат» в утилитах.
@@ -126,7 +126,7 @@ class FilesDialog(QDialog):
         self._folder_key = folder_key
         self._current_path = ""
 
-        self.setWindowTitle("Готовые файлы — Core V3.0")
+        self.setWindowTitle("Готовые файлы — Core V3.1")
         self.setModal(True)
         self.resize(1000, 650)
         self.setMinimumSize(760, 480)

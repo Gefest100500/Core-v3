@@ -1,6 +1,6 @@
 # ml/__init__.py
 """
-ML-модуль Core V3.0.
+ML-модуль Core V3.1.
 
 Shadow Engine — «Стажёр», который работает параллельно с жёсткими
 правилами и пишет свои гипотезы в Logs/shadow_report.jsonl и
