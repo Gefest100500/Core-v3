@@ -14,7 +14,7 @@
 #define AppVersion "3.1"
 #define AppPublisher "Сильченко Алексей"
 #define AppExeName "CoreV3.exe"
-#define SourceDir "dist\CoreV3"
+#define SourceDir "..\dist\CoreV3"
 
 [Setup]
 AppId={{8E4F2A61-3C7D-4B15-9A2E-6D8C1F0B5A73}
@@ -42,7 +42,7 @@ LZMAUseSeparateProcess=yes
 
 ; Оформление
 WizardStyle=modern
-SetupIconFile=icon.ico
+SetupIconFile=..\icon.ico
 UninstallDisplayIcon={app}\{#AppExeName}
 UninstallDisplayName={#AppName} {#AppVersion}
 ShowLanguageDialog=no
@@ -69,7 +69,7 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 
 ; Пустая папка data — если её нет, программа создаст сама,
 ; но так надёжнее при первом запуске
-Source: "data\.keep"; DestDir: "{app}\data"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\data\.keep"; DestDir: "{app}\data"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"

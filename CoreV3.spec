@@ -48,6 +48,18 @@ for name in SPRAVOCHNIKI:
     if os.path.isfile(path):
         datas.append((path, "data"))
 
+# ---- Нативные DLL pywv2 ------------------------------------------------
+# pywv2 при установке из pip держит proxy-layer DLL вне пакета, и
+# PyInstaller их не захватывает. Без них в собранной версии падает
+# виджет погоды (PYWV2_ERR_DLL_NOT_FOUND).
+try:
+    import pywv2 as _pywv2
+    _bin_dir = os.path.join(os.path.dirname(_pywv2.__file__), "bin")
+    if os.path.isdir(_bin_dir):
+        datas.append((_bin_dir, os.path.join("pywv2", "bin")))
+except ImportError:
+    pass
+
 # ---- Скрытые импорты ---------------------------------------------------
 hiddenimports = [
     "PyQt6.QtPrintSupport",

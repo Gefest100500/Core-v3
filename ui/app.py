@@ -340,7 +340,6 @@ class AuditApp(QMainWindow):
             ("inventory", "Инвентаризация"),
             ("utils", "Утилиты"),
             ("terminal", "Терминал"),
-            ("dashboard", "Дашборд"),
             ("archive", "Архив"),
             ("timesheet", "Табель"),
             ("guide", "Регламент"),
@@ -350,7 +349,7 @@ class AuditApp(QMainWindow):
 
         for key, label_text in buttons:
             tab_name = key
-            icon_name = "chart" if key == "dashboard" else key
+            icon_name = key
             if key == "settings":
                 icon_name = "settings"
 
@@ -607,10 +606,6 @@ class AuditApp(QMainWindow):
         if name == "home":
             from ui.frames.home_frame import HomeFrame
             return HomeFrame(self, name)
-
-        if name == "dashboard":
-            from ui.frames.dashboard_frame import DashboardFrame
-            return DashboardFrame(self, name)
 
         if name == "comments":
             from ui.frames.comments_frame import CommentsFrame

@@ -48,7 +48,7 @@
     │       ├── distance_frame.py   Расстояние между ГМ
     │       ├── terminal_frame.py   Терминал (mstsc)
     │       ├── tsd_frame.py        ТСД (QR-коды)
-    │       ├── dashboard_frame.py  Дашборд отчётов из Outlook
+    │       ├── dashboard_frame.py  Дашборд ГМ (открывается из Архива)
     │       ├── archive_frame.py    Архив инвентаризаций
     │       ├── info_frame.py       Информация
     │       └── utils_frame.py      Меню утилит
