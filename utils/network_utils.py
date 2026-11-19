@@ -162,3 +162,53 @@ def check_host(host, timeout=3):
         result["online"] = True
 
     return result
+
+def scan_printer_ports(host, timeout=2):
+    """Проверяет ВСЕ порты принтера и возвращает, какие открыты.
+
+    Нужно, чтобы понять тип принтера до установки:
+    - 631 (IPP)  — современный сетевой принтер, драйвер IPP Class
+    - 9100 (RAW) — классический JetDirect
+    - 515 (LPD)  — старый протокол
+    - 80/443     — веб-интерфейс, принтер точно живой
+
+    Returns:
+        dict: {"open": [порты], "type": "ipp"|"raw"|"lpd"|"web"|"unknown"}
+    """
+    opened = []
+
+    for port in PRINTER_PORTS:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(timeout)
+            code = s.connect_ex((host, port))
+            s.close()
+            if code == 0:
+                opened.append(port)
+        except Exception:
+            continue
+
+    if 631 in opened:
+        kind = "ipp"
+    elif 9100 in opened:
+        kind = "raw"
+    elif 515 in opened:
+        kind = "lpd"
+    elif 80 in opened or 443 in opened:
+        kind = "web"
+    else:
+        kind = "unknown"
+
+    return {"open": opened, "type": kind}
+
+
+def preferred_driver_for_port_type(port_type):
+    """Подсказывает драйвер по типу принтера."""
+    mapping = {
+        "ipp": "Microsoft IPP Class Driver",
+        "raw": "Microsoft IPP Class Driver",
+        "lpd": "Microsoft IPP Class Driver",
+        "web": "Microsoft IPP Class Driver",
+        "unknown": "Microsoft IPP Class Driver",
+    }
+    return mapping.get(port_type, "Microsoft IPP Class Driver")

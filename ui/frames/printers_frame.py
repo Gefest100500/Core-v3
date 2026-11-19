@@ -556,7 +556,18 @@ class PrintersFrame(BaseFrame):
             try:
                 log.info(f"PrintersFrame: установка по IP {normalized}...")
                 from core.printer_manager import PrinterManager
-                success, result = PrinterManager().add_printer_by_ip(normalized, "")
+
+                def _on_driver_progress(idx, total, driver):
+                    self.run_on_ui(
+                        self._set_ip_status,
+                        f"Установка принтера {normalized}...\n"
+                        f"Пробую драйвер {idx} из {total}: {driver}",
+                        "#FFD700",
+                    )
+
+                success, result = PrinterManager().add_printer_by_ip(
+                    normalized, "", progress_callback=_on_driver_progress
+                )
                 log.info(f"PrintersFrame: установка завершена, success={success}")
                 self.run_on_ui(self._on_ip_add_done, success, result, normalized)
             except Exception as e:
@@ -593,10 +604,15 @@ class PrintersFrame(BaseFrame):
             self._do_scan()
             self.tabs.setCurrentIndex(0)
 
-            self.show_success(
-                "Готово",
-                f"{msg}\n\nНайдите его вверху списка «Установленные»."
-            )
+            warning = result.get("warning", "")
+            if warning:
+                # Установлен, но не готов: замятие, оффлайн, нет тонера...
+                self.show_warning("Установлено с замечанием", f"{msg}\n\n{warning}")
+            else:
+                self.show_success(
+                    "Готово",
+                    f"{msg}\n\nНайдите его вверху списка «Установленные»."
+                )
         else:
             err = result if isinstance(result, str) else "Неизвестная ошибка"
             self._set_ip_status(

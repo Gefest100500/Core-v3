@@ -9,7 +9,10 @@ import re
 import time
 
 from utils.logger import log
-from utils.network_utils import normalize_ip, is_valid_ip, check_host
+from utils.network_utils import (
+    normalize_ip, is_valid_ip, check_host,
+    scan_printer_ports, preferred_driver_for_port_type,
+)
 
 
 class PrinterManager:
@@ -33,21 +36,59 @@ class PrinterManager:
                 p_port = printer_info.get('pPortName', 'Локальный')
                 p_status = printer_info.get('Status', 0)
 
-                status_text = ""
-                if p_status & win32print.PRINTER_STATUS_ERROR:
-                    status_text += "[Ошибка] "
-                if p_status & win32print.PRINTER_STATUS_OFFLINE:
-                    status_text += "[Оффлайн]"
-
                 printers.append({
                     'name': p_name,
                     'port': p_port,
-                    'status': status_text.strip() or "Готов"
+                    'status': self._decode_status(p_status),
+                    'status_raw': p_status,
                 })
         except Exception as e:
             return {"error": f"Не удалось получить список: {e}"}
 
         return sorted(printers, key=lambda x: x['name'])
+
+    @staticmethod
+    def _decode_status(status_flags: int) -> str:
+        """Расшифровывает битовую маску статуса WinAPI в человеческий текст.
+
+        Старый код проверял только ERROR и OFFLINE, поэтому принтер с
+        замятием бумаги или открытой крышкой показывался как «Готов».
+        """
+        if not status_flags:
+            return "Готов"
+
+        problems = []
+
+        checks = [
+            ("Ошибка", "PRINTER_STATUS_ERROR"),
+            ("Оффлайн", "PRINTER_STATUS_OFFLINE"),
+            ("Замятие бумаги", "PRINTER_STATUS_PAPER_JAM"),
+            ("Нет бумаги", "PRINTER_STATUS_PAPER_OUT"),
+            ("Нет тонера", "PRINTER_STATUS_NO_TONER"),
+            ("Открыта крышка", "PRINTER_STATUS_DOOR_OPEN"),
+            ("На паузе", "PRINTER_STATUS_PAUSED"),
+            ("Занят", "PRINTER_STATUS_BUSY"),
+            ("Печатает", "PRINTER_STATUS_PRINTING"),
+            ("Внимание", "PRINTER_STATUS_NOT_AVAILABLE"),
+            ("Разогрев", "PRINTER_STATUS_WARMING_UP"),
+            ("Отключён", "PRINTER_STATUS_NOT_AVAILABLE"),
+        ]
+
+        seen = set()
+        for label, attr in checks:
+            if attr in seen:
+                continue
+            seen.add(attr)
+
+            flag = getattr(win32print, attr, 0)
+            if flag and (status_flags & flag):
+                problems.append(label)
+
+        if not problems:
+            return "Готов"
+
+        return ", ".join(problems)
+
 
     # =========================================================
     # 2. Запуск PowerShell
@@ -131,7 +172,8 @@ class PrinterManager:
     # =========================================================
     # 5. Установка принтера по IP
     # =========================================================
-    def add_printer_by_ip(self, ip_address, printer_name="", timeout=90):
+    def add_printer_by_ip(self, ip_address, printer_name="", timeout=90,
+                          progress_callback=None):
         ip = ip_address.strip()
 
         if ip.startswith("\\\\"):
@@ -222,15 +264,34 @@ class PrinterManager:
         available_drivers = self.get_available_drivers()
         log.info(f"Доступных драйверов: {len(available_drivers)}")
 
-        # Приоритетный список драйверов (по надёжности)
+        # ----------------------------------------------------
+        # Шаг 4a: узнать тип принтера по открытым портам
+        # (до перебора драйверов — заодно проверяем, что он вообще живой)
+        # ----------------------------------------------------
+        port_info = scan_printer_ports(normalized_ip, timeout=2)
+        port_type_hint = port_info.get("type", "unknown")
+        open_ports = port_info.get("open", [])
+
+        if not open_ports:
+            log.warning(
+                f"На {normalized_ip} не открыт ни один порт принтера "
+                f"(проверяли 9100/515/631/80/443). Возможно, принтер выключен "
+                f"или блокирует соединения — продолжаем установку."
+            )
+        else:
+            log.info(f"На {normalized_ip} открыты порты: {open_ports} (тип: {port_type_hint})")
+
+        # Драйверы по надёжности. Microsoft Print To PDF здесь НЕТ:
+        # он создаёт виртуальный принтер, и установка "успешно" завершится,
+        # но печатать на сетевой принтер не будет.
         drivers_to_try = [
             "Microsoft IPP Class Driver",
             "Microsoft Virtual Print Class Driver",
             "Universal Print Class Driver",
             "Microsoft enhanced Point and Print compatibility driver",
             "Microsoft MS-XPS Class Driver 2",
-            "Microsoft Print To PDF",
         ]
+        log.info(f"Порт принтера: {port_type_hint}, драйверов к перебору: {len(drivers_to_try)}")
 
         # Также добавляем все HP-драйверы, которые есть
         for d in available_drivers:
@@ -240,12 +301,19 @@ class PrinterManager:
         last_error = ""
         success = False
 
-        for driver in drivers_to_try:
+        total_drivers = len(drivers_to_try)
+        for idx, driver in enumerate(drivers_to_try, start=1):
             if driver not in available_drivers:
                 log.info(f"Пропускаю (нет драйвера): {driver}")
                 continue
 
-            log.info(f"Пробуем драйвер: {driver}")
+            log.info(f"Пробуем драйвер {idx}/{total_drivers}: {driver}")
+
+            if progress_callback:
+                try:
+                    progress_callback(idx, total_drivers, driver)
+                except Exception:
+                    pass
 
             add_script = (
                 "$ErrorActionPreference = 'Stop'\n"
@@ -304,10 +372,19 @@ class PrinterManager:
         # ----------------------------------------------------
         found = self._find_printer_by_port(port_name)
         if found:
+            # Порт есть, но принтер может быть в ошибке/оффлайн —
+            # проверим статус, чтобы не отчитываться об успехе вслепую.
+            status = self._get_printer_status(found["name"])
+
             return True, {
                 "name": found["name"],
                 "port": port_name,
                 "driver": found.get("driver", ""),
+                "status": status,
+                "warning": (
+                    f"Принтер установлен, но сейчас в состоянии «{status}». "
+                    f"Проверьте, включён ли он и доступен ли по сети."
+                ) if status and status not in ("Готов", "Норма") else "",
             }
 
         # Если всё провалилось
@@ -320,6 +397,23 @@ class PrinterManager:
             f"3. Использовать мастер установки принтера Windows"
         )
         return False, error_msg
+
+    # =========================================================
+    # 5a. Статус принтера
+    # =========================================================
+    def _get_printer_status(self, name):
+        """Возвращает человекочитаемый статус принтера или пустую строку."""
+        try:
+            script = (
+                "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8" + "\n"
+                + '$p = Get-Printer -Name "' + name + '" -ErrorAction Stop' + "\n"
+                + "$p.PrinterStatus" + "\n"
+            )
+            stdout, _, _ = self._run_powershell(script, timeout=15)
+            return (stdout or "").strip()
+        except Exception as e:
+            log.debug(f"_get_printer_status: {e}")
+            return ""
 
     # =========================================================
     # 6. Найти принтер по порту
