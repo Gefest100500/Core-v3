@@ -223,19 +223,6 @@ class PrintersFrame(BaseFrame):
             btn_rename.setIconSize(QSize(16, 16))
         btn_row.addWidget(btn_rename)
 
-        btn_set_default = SecondaryButton(
-            "Сделать по умолчанию",
-            on_click=self._set_as_default,
-            parent=tab
-        )
-        btn_set_default.setMinimumWidth(220)
-        btn_set_default.setMinimumHeight(40)
-        star_icon = get_icon_simple("star", color=self.COLORS.get('text', '#E0E0E0'), size=16)
-        if not star_icon.isNull():
-            btn_set_default.setIcon(star_icon)
-            btn_set_default.setIconSize(QSize(16, 16))
-        btn_row.addWidget(btn_set_default)
-
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
@@ -514,10 +501,6 @@ class PrintersFrame(BaseFrame):
         act_rename = QAction("Переименовать", self)
         act_rename.triggered.connect(self.rename_printer)
         menu.addAction(act_rename)
-
-        act_default = QAction("Сделать по умолчанию", self)
-        act_default.triggered.connect(self._set_as_default)
-        menu.addAction(act_default)
 
         menu.exec(self.list_installed.mapToGlobal(pos))
 
