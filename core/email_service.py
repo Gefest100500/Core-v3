@@ -68,7 +68,6 @@ def collect_emails(
         "parsed": 0,
         "saved": 0,
         "duplicates": 0,
-        "skipped_not_final": 0,
         "failed": 0,
         "details": [],
     }
@@ -125,15 +124,9 @@ def collect_emails(
 
         result["parsed"] += 1
 
-        # --- Берём только финальное письмо ---
-        # Финальное = есть строки «Сумма полной инвентаризации c/без РМ и МЦ».
-        # Дневные письма отбрасываем: архив должен содержать только
-        # завершённые инвентаризации.
-        if not parsed.get("is_final"):
-            result["skipped_not_final"] = result.get("skipped_not_final", 0) + 1
-            report(f"Обработано {i} из {len(emails)} (дневное, пропущено)")
-            continue
-
+        # Сохраняем ВСЕ письма: дневные нужны для аналитики по зонам,
+        # событиям и часам ревизоров. Финальные — для итоговых сумм.
+        # Архив пополняется только финальными (см. add_to_archive).
         parsed["_raw_subject"] = subject
         parsed["_raw_body"] = body
         parsed_list.append(parsed)
@@ -141,17 +134,11 @@ def collect_emails(
         report(f"Обработано {i} из {len(emails)}")
 
     # --- Батч-сохранение ---
-    skipped = result.get("skipped_not_final", 0)
-    if skipped:
-        log.info(
-            f"collect_emails: пропущено дневных писем (не финальные) — {skipped}"
-        )
-
     if not parsed_list:
         result["success"] = True
         result["error"] = ""
-        report("Финальных писем не найдено")
-        log.info("collect_emails: финальных писем нет — нечего сохранять")
+        report("Писем не найдено")
+        log.info("collect_emails: нечего сохранять")
         return result
 
     report(f"Сохранение {len(parsed_list)} писем...")
@@ -174,8 +161,7 @@ def collect_emails(
     log.info(
         f"collect_emails: итог — fetched={result['fetched']}, "
         f"parsed={result['parsed']}, saved={result['saved']}, "
-        f"duplicates={result['duplicates']}, failed={result['failed']}, "
-        f"skipped_not_final={result.get('skipped_not_final', 0)}"
+        f"duplicates={result['duplicates']}, failed={result['failed']}"
     )
 
     return result

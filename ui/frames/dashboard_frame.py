@@ -3,25 +3,21 @@
 Дашборд инвентаризации ГМ.
 
 Открывается из Архива (is_embedded=True) по выбранной инвентаризации.
-Работает на ФИНАЛЬНЫХ письмах: дневные больше не собираются.
+Строится на ВСЕХ письмах ГМ: дневные дают зоны, динамику и часы
+ревизоров, финальное — итоговые суммы и финансы.
 
-Что показывает (из final_details парсера):
-- шапку: ГМ, формат, вариант, даты, длительность, период, комиссия;
-- итоги: сумма с РМ и МЦ / без РМ и МЦ;
-- модуль отклонений с выделенной зоной;
-- круговой график: списания vs инвентаризации в структуре отклонений;
-- финансы за период: продажи, отклонения по списаниям и инвентаризациям;
-- кассу ГК: план, факт, результат сверки;
-- качество технологий товародвижения.
+Правило знака в Core:
+    сумма >= 0  — НЕДОСТАЧА
+    сумма <  0  — ИЗЛИШЕК
 
 Экспорт: «Сохранить как PNG» снимает весь дашборд.
 """
 import os
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QSize, QRectF, QSettings
+from PyQt6.QtCore import Qt, QSize, QRectF, QSettings, QPointF
 from PyQt6.QtGui import (
-    QColor, QBrush, QPen, QFont, QPainter, QFontMetrics, QPixmap,
+    QColor, QBrush, QPen, QFont, QPainter, QFontMetrics, QPixmap, QPolygonF,
 )
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea,
@@ -31,7 +27,10 @@ from PyQt6.QtWidgets import (
 from ui.frames.base_frame import BaseFrame
 from ui.components.widgets import SecondaryButton
 from ui.icons import get_icon_simple
-from core.email_analytics import get_zone_color, summary
+from core.email_analytics import (
+    summary, top_zones, top_other_events, time_total, summary_history,
+    get_zone_color, ZONES_CANONICAL,
+)
 from utils.logger import log
 
 SETTINGS_ORG = "SilchenkoAleksey"
@@ -39,6 +38,7 @@ SETTINGS_APP = "CoreV3"
 
 CARD_BG = "#222222"
 CARD_BORDER = "#333333"
+BG = "#1B1B1B"
 TEXT = "#E0E0E0"
 TEXT_DIM = "#A0A0A0"
 ACCENT = "#D42626"
@@ -47,19 +47,25 @@ ERROR = "#FF5252"
 WARN = "#FFD700"
 
 
-def _fmt_money(v) -> str:
-    """1 622 598,15 ₽"""
+# =========================================================
+# ФОРМАТИРОВАНИЕ
+# =========================================================
+def _fmt_money(v, sign: bool = True) -> str:
+    """1 622 598,15 ₽ — знак минус только для излишка."""
     if v is None:
         return "—"
     try:
-        s = f"{float(v):,.2f}".replace(",", " ").replace(".", ",")
-        return f"{s} ₽"
+        val = float(v)
     except (TypeError, ValueError):
         return "—"
+    prefix = ""
+    if sign and val < 0:
+        prefix = "−"
+    s = f"{abs(val):,.2f}".replace(",", " ").replace(".", ",")
+    return f"{prefix}{s} ₽"
 
 
 def _fmt_int(v) -> str:
-    """1 873 609 838"""
     if v is None:
         return "—"
     try:
@@ -77,106 +83,223 @@ def _fmt_percent(v) -> str:
         return ""
 
 
-def _sign_color(sign_type: str) -> str:
-    """Цвет по типу: недостача — красный, излишек — зелёный."""
-    s = (sign_type or "").lower()
-    if s.startswith("излиш"):
-        return SUCCESS
-    if s.startswith("недостач"):
-        return ERROR
-    return TEXT
+def _type_word(v) -> str:
+    """Слово по знаку: >= 0 — недостача, < 0 — излишек."""
+    try:
+        return "излишек" if float(v) < 0 else "недостача"
+    except (TypeError, ValueError):
+        return ""
 
 
-class PieChart(QWidget):
-    """Круговой график с легендой-списком справа."""
+def _type_color(v) -> str:
+    """Цвет по знаку."""
+    try:
+        return SUCCESS if float(v) < 0 else ERROR
+    except (TypeError, ValueError):
+        return TEXT
 
-    def __init__(self, data=None, parent=None, center_text=None):
+
+# =========================================================
+# ГРАФИКИ
+# =========================================================
+class DonutChart(QWidget):
+    """Круговой график по зонам с подписями-выносками."""
+
+    def __init__(self, data=None, parent=None, center_text="", center_sub=""):
         super().__init__(parent)
-        self._data = data or []          # [(label, value, color)]
+        self._data = data or []        # [(label, value, color)]
         self._center_text = center_text
-        self.setMinimumSize(240, 240)
+        self._center_sub = center_sub
+        self.setMinimumSize(360, 360)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
 
-    def set_data(self, data, center_text=None):
+    def set_data(self, data, center_text="", center_sub=""):
         self._data = data or []
         self._center_text = center_text
+        self._center_sub = center_sub
         self.update()
 
     def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        if not self._data:
-            painter.setPen(QColor(TEXT_DIM))
-            painter.setFont(QFont("Segoe UI", 11))
-            painter.drawText(
-                self.rect(), Qt.AlignmentFlag.AlignCenter, "Нет данных"
-            )
-            painter.end()
+        items = [(l, abs(v), c) for l, v, c in self._data if abs(v) > 0]
+        if not items:
+            p.setPen(QColor(TEXT_DIM))
+            p.setFont(QFont("Segoe UI", 11))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Нет данных")
+            p.end()
             return
 
-        total = sum(abs(v) for _, v, _ in self._data)
-        if total <= 0:
-            painter.setPen(QColor(TEXT_DIM))
-            painter.setFont(QFont("Segoe UI", 11))
-            painter.drawText(
-                self.rect(), Qt.AlignmentFlag.AlignCenter, "Нет данных"
-            )
-            painter.end()
-            return
+        total = sum(v for _, v, _ in items)
 
         side = min(self.width(), self.height()) - 24
-        if side < 120:
-            side = 120
+        if side < 160:
+            side = 160
         x = (self.width() - side) // 2
         y = (self.height() - side) // 2
         rect = QRectF(x, y, side, side)
 
-        start_angle = 90 * 16
-        for _label, value, color in self._data:
-            abs_v = abs(value)
-            if abs_v <= 0:
-                continue
-            span = int(360 * 16 * abs_v / total)
-            painter.setBrush(QBrush(QColor(color)))
-            painter.setPen(QPen(QColor(CARD_BG), 2))
-            painter.drawPie(rect, start_angle, -span)
-            start_angle -= span
+        # сектора
+        start = 90 * 16
+        for _label, value, color in items:
+            span = int(360 * 16 * value / total)
+            p.setBrush(QBrush(QColor(color)))
+            p.setPen(QPen(QColor(CARD_BG), 2))
+            p.drawPie(rect, start, -span)
+            start -= span
 
-        # Внутренний круг — «пончик»
-        inner_side = int(side * 0.58)
-        inner_x = x + (side - inner_side) // 2
-        inner_y = y + (side - inner_side) // 2
-        painter.setBrush(QBrush(QColor(CARD_BG)))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(QRectF(inner_x, inner_y, inner_side, inner_side))
+        # «пончик»
+        inner = int(side * 0.56)
+        ix = x + (side - inner) // 2
+        iy = y + (side - inner) // 2
+        p.setBrush(QBrush(QColor(CARD_BG)))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawEllipse(QRectF(ix, iy, inner, inner))
 
+        # центр
         if self._center_text:
-            painter.setPen(QColor(TEXT))
-            font = QFont("Segoe UI", 12)
-            font.setBold(True)
-            painter.setFont(font)
-            painter.drawText(
-                QRectF(inner_x, inner_y, inner_side, inner_side),
+            p.setPen(QColor(TEXT))
+            f = QFont("Segoe UI", 13)
+            f.setBold(True)
+            p.setFont(f)
+            top_h = inner // 2
+            p.drawText(
+                QRectF(ix, iy + inner * 0.18, inner, top_h),
                 Qt.AlignmentFlag.AlignCenter,
                 self._center_text,
             )
+            if self._center_sub:
+                p.setPen(QColor(TEXT_DIM))
+                p.setFont(QFont("Segoe UI", 9))
+                p.drawText(
+                    QRectF(ix, iy + inner * 0.55, inner, inner * 0.3),
+                    Qt.AlignmentFlag.AlignCenter,
+                    self._center_sub,
+                )
 
-        painter.end()
+        p.end()
+
+
+class LineChart(QWidget):
+    """Линейный график динамики по дням."""
+
+    PAD_LEFT = 90
+    PAD_RIGHT = 24
+    PAD_TOP = 24
+    PAD_BOTTOM = 40
+    POINT_R = 4
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._points = []              # [(label, value)]
+        self.setMinimumHeight(260)
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+
+    def set_points(self, points):
+        self._points = points or []
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        if not self._points:
+            p.setPen(QColor(TEXT_DIM))
+            p.setFont(QFont("Segoe UI", 11))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Нет данных")
+            p.end()
+            return
+
+        w = self.width()
+        h = self.height()
+        x0 = self.PAD_LEFT
+        x1 = w - self.PAD_RIGHT
+        y0 = self.PAD_TOP
+        y1 = h - self.PAD_BOTTOM
+
+        values = [v for _, v in self._points]
+        vmin = min(values + [0])
+        vmax = max(values + [0])
+        if vmax == vmin:
+            vmax = vmin + 1
+
+        def ypix(v):
+            return y1 - (v - vmin) / (vmax - vmin) * (y1 - y0)
+
+        # Сетка + подписи оси Y
+        p.setFont(QFont("Segoe UI", 8))
+        steps = 4
+        for i in range(steps + 1):
+            val = vmin + (vmax - vmin) * i / steps
+            yy = ypix(val)
+            p.setPen(QPen(QColor("#2A2A2A"), 1, Qt.PenStyle.DashLine))
+            p.drawLine(int(x0), int(yy), int(x1), int(yy))
+            p.setPen(QColor(TEXT_DIM))
+            p.drawText(
+                QRectF(0, yy - 8, self.PAD_LEFT - 8, 16),
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                _fmt_int(val),
+            )
+
+        # Нулевая линия
+        if vmin < 0 < vmax:
+            p.setPen(QPen(QColor("#444444"), 1))
+            p.drawLine(int(x0), int(ypix(0)), int(x1), int(ypix(0)))
+
+        n = len(self._points)
+        if n == 1:
+            coords = [QPointF((x0 + x1) / 2, ypix(values[0]))]
+        else:
+            step = (x1 - x0) / (n - 1)
+            coords = [QPointF(x0 + i * step, ypix(v)) for i, v in enumerate(values)]
+
+        # Заливка под линией
+        poly = QPolygonF()
+        poly.append(QPointF(coords[0].x(), ypix(0)))
+        for c in coords:
+            poly.append(c)
+        poly.append(QPointF(coords[-1].x(), ypix(0)))
+        p.setBrush(QBrush(QColor(ACCENT + "33", )))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawPolygon(poly)
+
+        # Линия
+        p.setPen(QPen(QColor(ACCENT), 2))
+        for i in range(len(coords) - 1):
+            p.drawLine(coords[i], coords[i + 1])
+
+        # Точки + подписи X
+        p.setFont(QFont("Segoe UI", 8))
+        for i, (label, val) in enumerate(self._points):
+            c = coords[i]
+            p.setBrush(QBrush(QColor(ACCENT)))
+            p.setPen(QPen(QColor(BG), 2))
+            p.drawEllipse(c, self.POINT_R, self.POINT_R)
+            p.setPen(QColor(TEXT_DIM))
+            p.drawText(
+                QRectF(c.x() - 40, y1 + 6, 80, 16),
+                Qt.AlignmentFlag.AlignCenter,
+                str(label),
+            )
+
+        p.end()
 
 
 class HBar(QFrame):
-    """Горизонтальный бар с подписью и значением."""
+    """Горизонтальный бар: подпись — полоса — значение."""
 
-    LABEL_WIDTH = 260
-    VALUE_WIDTH = 150
+    LABEL_WIDTH = 250
+    VALUE_WIDTH = 170
 
     def __init__(self, label, value, max_value, color=None,
                  value_text=None, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(26)
+        self.setFixedHeight(28)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
@@ -185,81 +308,83 @@ class HBar(QFrame):
         if color is None:
             color = ACCENT
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(10)
 
         self._full_label = str(label)
         self._label = QLabel(self)
         self._label.setFixedWidth(self.LABEL_WIDTH)
         self._label.setStyleSheet(f"color: {TEXT}; background: transparent;")
         self._label.setToolTip(self._full_label)
-        layout.addWidget(self._label)
+        lay.addWidget(self._label)
 
-        bar_area = QFrame()
-        bar_area.setFixedHeight(10)
-        bar_area.setStyleSheet("QFrame { background: transparent; }")
-        bar_area.setSizePolicy(
+        area = QFrame()
+        area.setFixedHeight(12)
+        area.setStyleSheet("QFrame { background: transparent; }")
+        area.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
 
-        self.bar = QFrame(bar_area)
+        self.bar = QFrame(area)
         self.bar.setStyleSheet(
-            f"QFrame {{ background-color: {color}; border-radius: 5px; }}"
+            f"QFrame {{ background-color: {color}; border-radius: 6px; }}"
         )
 
-        self._bar_area = bar_area
-        self._max_value = max_value
+        self._area = area
+        self._max = max_value
         self._value = value
-        layout.addWidget(bar_area, 1)
+        lay.addWidget(area, 1)
 
-        text_val = value_text if value_text is not None else str(value)
-        val_label = QLabel(text_val)
-        val_label.setFixedWidth(self.VALUE_WIDTH)
-        val_label.setStyleSheet(
-            f"color: {TEXT}; font-family: Consolas; background: transparent;"
+        txt = value_text if value_text is not None else str(value)
+        vlab = QLabel(txt)
+        vlab.setFixedWidth(self.VALUE_WIDTH)
+        vlab.setStyleSheet(
+            f"color: {TEXT}; font-family: Consolas; font-size: 12px; "
+            f"background: transparent;"
         )
-        val_label.setAlignment(
+        vlab.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
-        layout.addWidget(val_label)
+        lay.addWidget(vlab)
 
-        self._update_label_elide()
+        self._elide()
 
-    def _update_label_elide(self):
+    def _elide(self):
         try:
             fm = QFontMetrics(self._label.font())
-            elided = fm.elidedText(
-                self._full_label,
-                Qt.TextElideMode.ElideRight,
+            self._label.setText(fm.elidedText(
+                self._full_label, Qt.TextElideMode.ElideRight,
                 self.LABEL_WIDTH - 4,
-            )
-            self._label.setText(elided)
+            ))
         except Exception:
             self._label.setText(self._full_label)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._update_bar()
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._update()
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._update_bar()
-        self._update_label_elide()
+    def showEvent(self, e):
+        super().showEvent(e)
+        self._update()
+        self._elide()
 
-    def _update_bar(self):
+    def _update(self):
         try:
-            cw = self._bar_area.width()
-            h = self._bar_area.height()
-            if self._max_value > 0:
-                w = int(cw * self._value / self._max_value)
+            cw = self._area.width()
+            ch = self._area.height()
+            if self._max > 0:
+                w = int(cw * abs(self._value) / self._max)
             else:
                 w = 0
-            self.bar.setGeometry(0, 0, max(0, w), h)
+            self.bar.setGeometry(0, 0, max(0, w), ch)
         except Exception:
             pass
 
 
+# =========================================================
+# ДАШБОРД
+# =========================================================
 class DashboardFrame(BaseFrame):
     TITLE = "Дашборд"
 
@@ -272,43 +397,32 @@ class DashboardFrame(BaseFrame):
         super().__init__(parent, name)
         self.scroll_content = None
         self._settings = QSettings(SETTINGS_ORG, SETTINGS_APP)
+        self._gm_code = self._initial_gm_code
 
         self._setup_ui()
-
-        if self._initial_gm_code:
-            self._gm_code = self._initial_gm_code
-        else:
-            self._gm_code = ""
-
         self.refresh()
 
-    # =========================================================
-    # UI КАРКАС
-    # =========================================================
+    # ---------------------------------------------------------
     def _setup_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 8, 16, 8) if self._is_embedded \
-            else root.setContentsMargins(16, 16, 16, 16)
+        m = 8 if self._is_embedded else 16
+        root.setContentsMargins(16, m, 16, m)
         root.setSpacing(12)
 
-        top_row = QHBoxLayout()
-        top_row.setSpacing(12)
-        top_row.addStretch()
+        top = QHBoxLayout()
+        top.addStretch()
 
         self.btn_export = SecondaryButton(
-            "Сохранить как PNG",
-            on_click=self._export_png,
-            parent=self,
+            "Сохранить как PNG", on_click=self._export_png, parent=self
         )
         self.btn_export.setMinimumWidth(200)
         self.btn_export.setMinimumHeight(40)
-        export_icon = get_icon_simple("download", color=TEXT, size=16)
-        if not export_icon.isNull():
-            self.btn_export.setIcon(export_icon)
+        ic = get_icon_simple("download", color=TEXT, size=16)
+        if not ic.isNull():
+            self.btn_export.setIcon(ic)
             self.btn_export.setIconSize(QSize(16, 16))
-        top_row.addWidget(self.btn_export)
-
-        root.addLayout(top_row)
+        top.addWidget(self.btn_export)
+        root.addLayout(top)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -324,61 +438,58 @@ class DashboardFrame(BaseFrame):
         content.setStyleSheet("QWidget { background: transparent; }")
         self.main_layout = QVBoxLayout(content)
         self.main_layout.setContentsMargins(0, 0, 20, 0)
-        self.main_layout.setSpacing(18)
+        self.main_layout.setSpacing(16)
 
         scroll.setWidget(content)
         root.addWidget(scroll, 1)
-
         self.scroll_content = content
 
-    # =========================================================
-    # ОБЩИЕ ЭЛЕМЕНТЫ
-    # =========================================================
-    def _card(self, min_height: int = 0) -> tuple[QFrame, QVBoxLayout]:
+    # ---------------------------------------------------------
+    def _card(self, min_h: int = 0):
         card = QFrame(self.scroll_content)
         card.setStyleSheet(f"""
             QFrame {{
                 background-color: {CARD_BG};
                 border: 1px solid {CARD_BORDER};
-                border-radius: 10px;
+                border-radius: 12px;
             }}
         """)
-        if min_height:
-            card.setMinimumHeight(min_height)
-
+        if min_h:
+            card.setMinimumHeight(min_h)
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(18, 16, 18, 16)
-        lay.setSpacing(10)
+        lay.setContentsMargins(20, 18, 20, 18)
+        lay.setSpacing(12)
         return card, lay
 
-    def _section_title(self, text: str) -> QLabel:
+    def _section(self, text: str) -> QLabel:
         lbl = QLabel(text)
         lbl.setStyleSheet(
-            f"color: {ACCENT}; font-size: 11px; font-weight: bold; "
-            f"letter-spacing: 1px; background: transparent;"
+            f"color: {ACCENT}; font-size: 10px; font-weight: bold; "
+            f"letter-spacing: 1.2px; background: transparent;"
         )
         return lbl
 
-    def _stat(self, label: str, value: str, color: str = TEXT,
-              sub: str = "") -> QFrame:
-        frame = QFrame()
-        frame.setStyleSheet("QFrame { background: transparent; }")
-        lay = QVBoxLayout(frame)
+    def _stat(self, label, value, color=TEXT, sub=""):
+        w = QFrame()
+        w.setStyleSheet("QFrame { background: transparent; }")
+        lay = QVBoxLayout(w)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(4)
+        lay.setSpacing(3)
 
-        lbl = QLabel(label)
-        lbl.setStyleSheet(
-            f"color: {TEXT_DIM}; font-size: 11px; background: transparent;"
+        l = QLabel(label)
+        l.setStyleSheet(
+            f"color: {TEXT_DIM}; font-size: 10px; font-weight: bold; "
+            f"letter-spacing: 0.5px; background: transparent;"
         )
-        lay.addWidget(lbl)
+        lay.addWidget(l)
 
-        val = QLabel(value)
-        val.setStyleSheet(
-            f"color: {color}; font-size: 20px; font-weight: bold; "
+        v = QLabel(value)
+        v.setStyleSheet(
+            f"color: {color}; font-size: 22px; font-weight: bold; "
             f"background: transparent;"
         )
-        lay.addWidget(val)
+        v.setWordWrap(True)
+        lay.addWidget(v)
 
         if sub:
             s = QLabel(sub)
@@ -387,45 +498,40 @@ class DashboardFrame(BaseFrame):
             )
             lay.addWidget(s)
 
-        return frame
+        return w
 
     def _clear(self):
         while self.main_layout.count():
-            item = self.main_layout.takeAt(0)
-            w = item.widget()
+            it = self.main_layout.takeAt(0)
+            w = it.widget()
             if w is not None:
                 w.deleteLater()
-            child = item.layout()
-            if child is not None:
-                while child.count():
-                    sub = child.takeAt(0)
+            ch = it.layout()
+            if ch is not None:
+                while ch.count():
+                    sub = ch.takeAt(0)
                     sw = sub.widget()
                     if sw is not None:
                         sw.deleteLater()
 
-    # =========================================================
-    # ПОСТРОЕНИЕ
-    # =========================================================
+    # ---------------------------------------------------------
     def _refresh_all(self):
         self._clear()
 
-        gm_code = getattr(self, "_gm_code", "") or self._initial_gm_code
-
-        if not gm_code:
+        gm = self._gm_code or self._initial_gm_code
+        if not gm:
             hint = QLabel("Выберите инвентаризацию в Архиве")
             hint.setFont(self.FONTS['title'])
             hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            hint.setStyleSheet(
-                f"color: {TEXT_DIM}; padding: 60px 20px;"
-            )
+            hint.setStyleSheet(f"color: {TEXT_DIM}; padding: 60px 20px;")
             self.main_layout.addWidget(hint)
             self.main_layout.addStretch()
             return
 
         try:
-            s = summary(gm_code)
+            s = summary(gm)
         except Exception as e:
-            log.exception(f"DashboardFrame: ошибка аналитики: {e}")
+            log.exception(f"DashboardFrame: {e}")
             err = QLabel(f"Ошибка загрузки данных: {e}")
             err.setStyleSheet(f"color: {ERROR}; padding: 20px;")
             self.main_layout.addWidget(err)
@@ -438,74 +544,67 @@ class DashboardFrame(BaseFrame):
             t.setStyleSheet("padding: 40px;")
             self.main_layout.addWidget(t)
 
-            hint = QLabel(
-                "Соберите письма: «Забрать информацию» в Архиве."
-            )
-            hint.setStyleSheet(f"color: {TEXT_DIM};")
-            hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.main_layout.addWidget(hint)
+            h = QLabel("Соберите письма: «Забрать информацию» в Архиве.")
+            h.setStyleSheet(f"color: {TEXT_DIM};")
+            h.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.main_layout.addWidget(h)
             self.main_layout.addStretch()
             return
 
         self._build_header(s)
         self._build_totals(s)
-        self._build_breakdown(s)
-        self._build_finance(s)
+        self._build_zones_pie(s)
+        self._build_dynamics(gm)
+        self._build_all_zones(gm)
+        self._build_time_finance(s, gm)
         self._build_cash_quality(s)
 
         self.main_layout.addStretch()
 
     # ---------------------------------------------------------
-    def _build_header(self, s: dict):
+    def _build_header(self, s):
         card, lay = self._card()
 
-        title = QLabel(f"ГМ {s.get('gm_code', '')} — {s.get('gm_name', '')}")
-        title.setStyleSheet(
-            f"color: {TEXT}; font-size: 22px; font-weight: bold; "
+        t = QLabel(f"ГМ {s.get('gm_code', '')} — {s.get('gm_name', '')}")
+        t.setStyleSheet(
+            f"color: {TEXT}; font-size: 24px; font-weight: bold; "
             f"background: transparent;"
         )
-        lay.addWidget(title)
+        t.setWordWrap(True)
+        lay.addWidget(t)
 
         fd = s.get("final_details") or {}
-
-        meta_parts = []
+        parts = []
         if s.get("start_date") and s.get("end_date"):
-            meta_parts.append(f"{s['start_date']} — {s['end_date']}")
+            parts.append(f"{s['start_date']} — {s['end_date']}")
         if s.get("duration_text"):
-            meta_parts.append(s["duration_text"])
+            parts.append(s["duration_text"])
         elif s.get("duration_days"):
-            meta_parts.append(f"{s['duration_days']} суток")
+            parts.append(f"{s['duration_days']} суток")
         if s.get("variant"):
-            meta_parts.append(f"Вариант {s['variant']}")
+            parts.append(f"Вариант {s['variant']}")
         if fd.get("gm_format"):
-            meta_parts.append(f"Формат: {fd['gm_format']}")
+            parts.append(f"Формат: {fd['gm_format']}")
         if fd.get("last_period"):
-            meta_parts.append(f"Учётный период: {fd['last_period']}")
+            parts.append(f"Период: {fd['last_period']}")
 
-        if meta_parts:
-            meta = QLabel("  ·  ".join(meta_parts))
-            meta.setStyleSheet(
+        if parts:
+            m = QLabel("   ·   ".join(parts))
+            m.setStyleSheet(
                 f"color: {TEXT_DIM}; font-size: 13px; background: transparent;"
             )
-            meta.setWordWrap(True)
-            lay.addWidget(meta)
+            m.setWordWrap(True)
+            lay.addWidget(m)
 
-        commission = fd.get("commission") or []
-        if commission:
-            lay.addSpacing(6)
-
-            ct = QLabel("СОСТАВ КОМИССИИ")
-            ct.setStyleSheet(
-                f"color: {ACCENT}; font-size: 10px; font-weight: bold; "
-                f"letter-spacing: 1px; background: transparent;"
-            )
-            lay.addWidget(ct)
-
-            for person in commission:
+        comm = fd.get("commission") or []
+        if comm:
+            lay.addSpacing(4)
+            lay.addWidget(self._section("СОСТАВ КОМИССИИ"))
+            for person in comm:
                 name = person.get("name", "")
                 role = person.get("role", "")
-                line = f"{name}" + (f"  —  {role}" if role else "")
-                p = QLabel("• " + line)
+                txt = name + (f"  —  {role}" if role else "")
+                p = QLabel("•  " + txt)
                 p.setStyleSheet(
                     f"color: {TEXT}; font-size: 13px; background: transparent;"
                 )
@@ -514,301 +613,321 @@ class DashboardFrame(BaseFrame):
         self.main_layout.addWidget(card)
 
     # ---------------------------------------------------------
-    def _build_totals(self, s: dict):
+    def _build_totals(self, s):
         card, lay = self._card()
-        lay.addWidget(self._section_title("ИТОГИ ПОЛНОЙ ИНВЕНТАРИЗАЦИИ"))
+        lay.addWidget(self._section("ИТОГИ ПОЛНОЙ ИНВЕНТАРИЗАЦИИ"))
 
         row = QHBoxLayout()
-        row.setSpacing(24)
+        row.setSpacing(28)
 
         ft = s.get("final_totals") or {}
-        with_rm = ft.get("with_rm") or {}
-        without_rm = ft.get("without_rm") or {}
+        with_rm = (ft.get("with_rm") or {}).get("amount")
+        without_rm = (ft.get("without_rm") or {}).get("amount")
+        module = (s.get("final_details") or {}).get("module_deviation") or {}
 
         row.addWidget(self._stat(
-            "С РМ и МЦ",
-            _fmt_money(with_rm.get("amount")),
-            _sign_color(with_rm.get("type")),
-            (with_rm.get("type") or "").capitalize(),
+            "С РМ И МЦ", _fmt_money(with_rm),
+            _type_color(with_rm), _type_word(with_rm).capitalize(),
         ), 1)
 
         row.addWidget(self._stat(
-            "Без РМ и МЦ",
-            _fmt_money(without_rm.get("amount")),
-            _sign_color(without_rm.get("type")),
-            (without_rm.get("type") or "").capitalize(),
+            "БЕЗ РМ И МЦ", _fmt_money(without_rm),
+            _type_color(without_rm), _type_word(without_rm).capitalize(),
         ), 1)
+
+        if module.get("amount"):
+            row.addWidget(self._stat(
+                "МОДУЛЬ ОТКЛОНЕНИЙ",
+                _fmt_money(module["amount"]),
+                ACCENT, "сумма по модулю",
+            ), 1)
 
         lay.addLayout(row)
         self.main_layout.addWidget(card)
 
     # ---------------------------------------------------------
-    def _build_breakdown(self, s: dict):
-        """Модуль отклонений + зоны + круговой график финансирования."""
-        fd = s.get("final_details") or {}
-        module = fd.get("module_deviation") or {}
-        zones = fd.get("zones") or []
-        finance = fd.get("finance") or {}
+    def _build_zones_pie(self, s):
+        try:
+            zones = top_zones(self._gm_code)
+        except Exception:
+            zones = []
 
-        if not module and not zones:
+        zones = [z for z in zones if abs(z[1]) > 0]
+        if not zones:
             return
 
         card, lay = self._card()
-        lay.addWidget(self._section_title("СТРУКТУРА ОТКЛОНЕНИЙ"))
+        lay.addWidget(self._section("ПОТЕРИ ПО АНАЛИТИЧЕСКИМ ЗОНАМ"))
 
-        module_amount = module.get("amount") or 0
-        zone_amount = module.get("zone_amount") or 0
-        zone_name = module.get("zone") or ""
+        row = QHBoxLayout()
+        row.setSpacing(24)
 
-        # Информационная строка
-        if module_amount:
-            info = QLabel(
-                f"Модуль суммы отклонений: {_fmt_money(module_amount)}"
+        # Круговая
+        pie_data = [(name, total, get_zone_color(name))
+                    for name, total, _d, _s in zones]
+        grand = sum(v for _, v, _ in pie_data)
+
+        pie = DonutChart(
+            pie_data,
+            center_text=_fmt_int(grand),
+            center_sub="итого",
+        )
+        pie.setMinimumSize(380, 380)
+        row.addWidget(pie, 1)
+
+        # Легенда
+        leg = QFrame()
+        leg.setStyleSheet("QFrame { background: transparent; }")
+        leg_lay = QVBoxLayout(leg)
+        leg_lay.setContentsMargins(0, 0, 0, 0)
+        leg_lay.setSpacing(6)
+        leg_lay.addStretch()
+
+        for name, total, deficit, surplus in zones:
+            entry = QHBoxLayout()
+            entry.setSpacing(8)
+
+            dot = QLabel("●")
+            dot.setStyleSheet(
+                f"color: {get_zone_color(name)}; font-size: 15px; "
+                f"background: transparent;"
             )
-            info.setStyleSheet(
-                f"color: {TEXT}; font-size: 14px; background: transparent;"
+            entry.addWidget(dot)
+
+            nm = QLabel(name)
+            nm.setStyleSheet(
+                f"color: {TEXT}; font-size: 12px; background: transparent;"
             )
-            lay.addWidget(info)
+            entry.addWidget(nm)
+            entry.addStretch()
 
-        # Бары
-        bars_data = []
-        if module_amount:
-            bars_data.append(("Модуль отклонений", module_amount, ACCENT))
-        for z in zones:
-            bars_data.append((
-                z.get("name", ""),
-                abs(z.get("amount") or 0),
-                get_zone_color(z.get("name", "")),
-            ))
-        if zone_name and zone_amount:
-            bars_data.append((zone_name, abs(zone_amount), get_zone_color(zone_name)))
+            pct = (abs(total) / grand * 100) if grand else 0
+            val = QLabel(
+                f"{_fmt_money(total)}  {pct:.0f}%".replace(".0%", "%")
+            )
+            val.setStyleSheet(
+                f"color: {_type_color(total)}; font-size: 11px; "
+                f"font-family: Consolas; background: transparent;"
+            )
+            entry.addWidget(val)
 
-        max_val = max((v for _, v, _ in bars_data), default=0)
+            wrap = QWidget()
+            wrap.setStyleSheet("QWidget { background: transparent; }")
+            wrap.setLayout(entry)
+            leg_lay.addWidget(wrap)
 
-        for label, value, color in bars_data:
+        leg_lay.addStretch()
+        row.addWidget(leg, 1)
+
+        push = QWidget()
+        push.setStyleSheet("QWidget { background: transparent; }")
+        push.setLayout(row)
+        lay.addWidget(push)
+
+        self.main_layout.addWidget(card)
+
+    # ---------------------------------------------------------
+    def _build_dynamics(self, gm):
+        try:
+            hist = summary_history(gm)
+        except Exception:
+            hist = []
+
+        if len(hist) < 2:
+            return
+
+        card, lay = self._card()
+        lay.addWidget(self._section("ДИНАМИКА ПО ДНЯМ"))
+
+        points = []
+        for h in hist:
+            d = h.get("date", "")
+            short = d[:5] if d else ""
+            points.append((short, h.get("grand_total", 0) or 0))
+
+        chart = LineChart()
+        chart.set_points(points)
+        lay.addWidget(chart)
+
+        self.main_layout.addWidget(card)
+
+    # ---------------------------------------------------------
+    def _build_all_zones(self, gm):
+        try:
+            zones = top_zones(gm)
+        except Exception:
+            zones = []
+
+        zones = [z for z in zones if abs(z[1]) > 0]
+        if not zones:
+            return
+
+        card, lay = self._card()
+        lay.addWidget(self._section("ВСЕ ЗОНЫ — ОТКЛОНЕНИЯ"))
+
+        max_val = max(abs(z[1]) for z in zones)
+
+        for name, total, deficit, surplus in zones:
             lay.addWidget(HBar(
-                label, value, max_val, color=color,
-                value_text=_fmt_money(value),
+                name, total, max_val,
+                color=get_zone_color(name),
+                value_text=f"{_fmt_money(total)}  ({_type_word(total)})",
             ))
 
-        # Круговой: списания vs инвентаризации
-        writeoff = (finance.get("writeoff") or {}).get("amount") or 0
-        inventory = (finance.get("inventory") or {}).get("amount") or 0
-
-        if writeoff or inventory:
-            lay.addSpacing(8)
-
-            pie_row = QHBoxLayout()
-            pie_row.setSpacing(20)
-
-            pie_data = []
-            if writeoff:
-                pie_data.append(("Списания", writeoff, "#E57373"))
-            if inventory:
-                pie_data.append(("Инвентаризации", inventory, ACCENT))
-
-            total_dev = writeoff + inventory
-            pie = PieChart(
-                pie_data,
-                center_text=_fmt_int(total_dev),
-            )
-            pie.setMinimumHeight(260)
-            pie_row.addWidget(pie, 1)
-
-            # Легенда
-            legend = QFrame()
-            legend.setStyleSheet("QFrame { background: transparent; }")
-            leg_lay = QVBoxLayout(legend)
-            leg_lay.setContentsMargins(0, 0, 0, 0)
-            leg_lay.setSpacing(8)
-            leg_lay.addStretch()
-
-            for label, value, color in pie_data:
-                lrow = QHBoxLayout()
-                dot = QLabel("●")
-                dot.setStyleSheet(
-                    f"color: {color}; font-size: 16px; background: transparent;"
-                )
-                lrow.addWidget(dot)
-
-                lname = QLabel(label)
-                lname.setStyleSheet(
-                    f"color: {TEXT}; font-size: 13px; background: transparent;"
-                )
-                lrow.addWidget(lname)
-                lrow.addStretch()
-
-                pct = (value / total_dev * 100) if total_dev else 0
-                lval = QLabel(f"{_fmt_money(value)}  ({pct:.1f}%)")
-                lval.setStyleSheet(
-                    f"color: {TEXT_DIM}; font-size: 12px; "
-                    f"font-family: Consolas; background: transparent;"
-                )
-                lrow.addWidget(lval)
-
-                wrap = QWidget()
-                wrap.setStyleSheet("QWidget { background: transparent; }")
-                wrap.setLayout(lrow)
-                leg_lay.addWidget(wrap)
-
-            leg_lay.addStretch()
-            pie_row.addWidget(legend, 1)
-
-            pie_wrap = QWidget()
-            pie_wrap.setStyleSheet("QWidget { background: transparent; }")
-            pie_wrap.setLayout(pie_row)
-            lay.addWidget(pie_wrap)
-
         self.main_layout.addWidget(card)
 
     # ---------------------------------------------------------
-    def _build_finance(self, s: dict):
-        fd = s.get("final_details") or {}
-        finance = fd.get("finance") or {}
+    def _build_time_finance(self, s, gm):
+        row = QHBoxLayout()
+        row.setSpacing(18)
 
-        sales = finance.get("sales")
-        writeoff = finance.get("writeoff") or {}
-        inventory = finance.get("inventory") or {}
-        total = finance.get("total") or {}
+        # --- Часы ревизоров ---
+        try:
+            hours = time_total(gm)
+        except Exception:
+            hours = []
 
-        if not any([sales, writeoff.get("amount"), inventory.get("amount"),
-                    total.get("amount")]):
-            return
+        if hours:
+            card, lay = self._card()
+            lay.addWidget(self._section("ЧАСЫ РЕВИЗОРОВ"))
+            max_h = max((h for _, h in hours), default=1)
+            for person, h in hours:
+                lay.addWidget(HBar(
+                    person, h, max_h,
+                    color=WARN,
+                    value_text=f"{h:.1f} ч".replace(".", ","),
+                ))
+            row.addWidget(card, 1)
 
-        card, lay = self._card()
-        lay.addWidget(self._section_title("ФИНАНСЫ ЗА УЧЁТНЫЙ ПЕРИОД"))
+        # --- Финансы ---
+        fin = (s.get("final_details") or {}).get("finance") or {}
+        if any(fin.get(k) for k in ("sales",)):
+            card, lay = self._card()
+            lay.addWidget(self._section("ФИНАНСЫ ЗА ПЕРИОД"))
 
-        if sales:
-            sales_lbl = QLabel(f"Продажи за период: {_fmt_money(sales)}")
-            sales_lbl.setStyleSheet(
-                f"color: {TEXT}; font-size: 15px; "
-                f"font-weight: bold; background: transparent;"
-            )
-            lay.addWidget(sales_lbl)
-            lay.addSpacing(8)
+            if fin.get("sales"):
+                lay.addWidget(self._stat(
+                    "ПРОДАЖИ", _fmt_money(fin["sales"], sign=False), TEXT
+                ))
 
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(24)
-        grid.setVerticalSpacing(10)
+            wo = fin.get("writeoff") or {}
+            if wo.get("amount") is not None:
+                lay.addWidget(self._stat(
+                    "СПИСАНИЯ", _fmt_money(wo["amount"], sign=False),
+                    ERROR, _fmt_percent(wo.get("percent")) + " от продаж",
+                ))
 
-        def add_cell(row, col, label, value, color=TEXT, sub=""):
-            cell = self._stat(label, value, color, sub)
-            grid.addWidget(cell, row, col)
+            inv = fin.get("inventory") or {}
+            if inv.get("amount") is not None:
+                lay.addWidget(self._stat(
+                    "ИНВЕНТАРИЗАЦИИ", _fmt_money(inv["amount"], sign=False),
+                    WARN, _fmt_percent(inv.get("percent")) + " от продаж",
+                ))
 
-        if writeoff.get("amount") is not None:
-            add_cell(
-                0, 0,
-                "Отклонения по списаниям",
-                _fmt_money(writeoff["amount"]),
-                ERROR,
-                _fmt_percent(writeoff.get("percent")) + " от продаж",
-            )
+            tot = fin.get("total") or {}
+            if tot.get("amount") is not None:
+                lay.addWidget(self._stat(
+                    "ИТОГО ОТКЛОНЕНИЙ", _fmt_money(tot["amount"], sign=False),
+                    ACCENT, _fmt_percent(tot.get("percent")) + " от продаж",
+                ))
 
-        if inventory.get("amount") is not None:
-            add_cell(
-                0, 1,
-                "Отклонения по инвентаризациям",
-                _fmt_money(inventory["amount"]),
-                WARN,
-                _fmt_percent(inventory.get("percent")) + " от продаж",
-            )
+            row.addWidget(card, 1)
 
-        if total.get("amount") is not None:
-            add_cell(
-                1, 0,
-                "Итого отклонений за период",
-                _fmt_money(total["amount"]),
-                ACCENT,
-                _fmt_percent(total.get("percent")) + " от продаж",
-            )
-
-        lay.addLayout(grid)
-        self.main_layout.addWidget(card)
+        if row.count():
+            wrap = QWidget()
+            wrap.setStyleSheet("QWidget { background: transparent; }")
+            wrap.setLayout(row)
+            self.main_layout.addWidget(wrap)
 
     # ---------------------------------------------------------
-    def _build_cash_quality(self, s: dict):
+    def _build_cash_quality(self, s):
         fd = s.get("final_details") or {}
         cash = fd.get("cash") or {}
-        quality = fd.get("quality") or {}
+        q = fd.get("quality") or {}
 
         plan = cash.get("plan")
         fact = cash.get("fact")
-        result = cash.get("result") or ""
-        qpct = quality.get("percent")
-        qlevel = quality.get("level") or ""
+        res = cash.get("result") or ""
+        qp = q.get("percent")
+        ql = q.get("level") or ""
 
-        if plan is None and fact is None and qpct is None:
+        if plan is None and fact is None and qp is None:
             return
 
         row = QHBoxLayout()
         row.setSpacing(18)
 
-        # Касса
         if plan is not None or fact is not None:
             card, lay = self._card()
-            lay.addWidget(self._section_title("КАССА ГК"))
+            lay.addWidget(self._section("КАССА ГК"))
 
             r = QHBoxLayout()
             r.setSpacing(24)
-            r.addWidget(self._stat(
-                "По учёту", _fmt_money(plan), TEXT
-            ), 1)
-            r.addWidget(self._stat(
-                "По факту", _fmt_money(fact), TEXT
-            ), 1)
+            r.addWidget(self._stat("ПО УЧЁТУ", _fmt_money(plan, False)), 1)
+            r.addWidget(self._stat("ПО ФАКТУ", _fmt_money(fact, False)), 1)
             lay.addLayout(r)
 
-            if result:
-                res = QLabel(result)
-                res.setStyleSheet(
-                    f"color: {SUCCESS if 'не выявл' in result.lower() else ERROR}; "
-                    f"font-size: 13px; background: transparent;"
+            if res:
+                ok = "не выявл" in res.lower()
+                rl = QLabel(res)
+                rl.setStyleSheet(
+                    f"color: {SUCCESS if ok else ERROR}; font-size: 13px; "
+                    f"background: transparent;"
                 )
-                lay.addWidget(res)
+                lay.addWidget(rl)
 
             row.addWidget(card, 1)
 
-        # Качество
-        if qpct is not None:
+        if qp is not None:
             card, lay = self._card()
-            lay.addWidget(self._section_title("КАЧЕСТВО ТЕХНОЛОГИЙ"))
+            lay.addWidget(self._section("КАЧЕСТВО ТЕХНОЛОГИЙ"))
 
             lay.addWidget(self._stat(
-                "Товародвижение ГМ",
-                f"{qpct:.1f} %".replace(".", ","),
-                SUCCESS if qpct >= 80 else WARN,
-                qlevel.capitalize() if qlevel else "",
+                "ТОВАРОДВИЖЕНИЕ ГМ",
+                f"{qp:.1f} %".replace(".", ","),
+                SUCCESS if qp >= 80 else WARN,
+                ql.capitalize() if ql else "",
             ))
+
+            # Прогресс-бар
+            bar = QFrame()
+            bar.setFixedHeight(10)
+            bar.setStyleSheet(
+                "QFrame { background-color: #2A2A2A; border-radius: 5px; }"
+            )
+            fill = QFrame(bar)
+            fill.setStyleSheet(
+                f"QFrame {{ background-color: "
+                f"{SUCCESS if qp >= 80 else WARN}; border-radius: 5px; }}"
+            )
+            fill.setGeometry(0, 0, int(bar.width() * qp / 100), 10)
+            lay.addWidget(bar)
 
             row.addWidget(card, 1)
 
-        wrap = QWidget()
-        wrap.setStyleSheet("QWidget { background: transparent; }")
-        wrap.setLayout(row)
-        self.main_layout.addWidget(wrap)
+        if row.count():
+            wrap = QWidget()
+            wrap.setStyleSheet("QWidget { background: transparent; }")
+            wrap.setLayout(row)
+            self.main_layout.addWidget(wrap)
 
-    # =========================================================
-    # ЭКСПОРТ
-    # =========================================================
+    # ---------------------------------------------------------
     def _export_png(self):
         try:
             from config import FOLDERS
-            out_dir = os.path.join(
-                FOLDERS.get("info", ""), "Дашборды"
-            )
+            out_dir = os.path.join(FOLDERS.get("info", ""), "Дашборды")
             os.makedirs(out_dir, exist_ok=True)
 
-            date_str = datetime.now().strftime("%Y%m%d_%H%M")
-            gm = getattr(self, "_gm_code", "") or "noGM"
-            path = os.path.join(out_dir, f"dashboard_{gm}_{date_str}.png")
+            stamp = datetime.now().strftime("%Y%m%d_%H%M")
+            gm = self._gm_code or "noGM"
+            path = os.path.join(out_dir, f"dashboard_{gm}_{stamp}.png")
 
-            target = self.scroll_content
-            if target is None:
+            if self.scroll_content is None:
                 self.show_error("Ошибка", "Нечего экспортировать.")
                 return
 
-            pixmap: QPixmap = target.grab()
-            if not pixmap.save(path, "PNG"):
+            pm = self.scroll_content.grab()
+            if not pm.save(path, "PNG"):
                 self.show_error("Ошибка", f"Не удалось сохранить PNG:\n{path}")
                 return
 
@@ -819,9 +938,7 @@ class DashboardFrame(BaseFrame):
             log.exception("DashboardFrame: ошибка экспорта PNG")
             self.show_error("Ошибка", f"Не удалось сохранить PNG:\n{e}")
 
-    # =========================================================
-    # ХУКИ
-    # =========================================================
+    # ---------------------------------------------------------
     def refresh(self):
         self._refresh_all()
 
