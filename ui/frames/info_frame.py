@@ -595,6 +595,13 @@ class InfoFrame(BaseFrame):
         dev_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         about_card.layout().addWidget(dev_label)
 
+        consultant_label = QLabel(
+            "Технический консультант: Хисматуллин Руслан", about_card
+        )
+        consultant_label.setFont(self.FONTS['label'])
+        consultant_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        about_card.layout().addWidget(consultant_label)
+
         modules_label = QLabel(ABOUT_TEXT, about_card)
         modules_label.setFont(self.FONTS['label'])
         modules_label.setAlignment(
