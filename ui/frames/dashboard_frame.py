@@ -303,7 +303,9 @@ class HBar(QFrame):
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        self.setStyleSheet("QFrame { background: transparent; }")
+        self.setStyleSheet(
+            "QFrame { background: transparent; border: none; }"
+        )
 
         if color is None:
             color = ACCENT
@@ -321,7 +323,9 @@ class HBar(QFrame):
 
         area = QFrame()
         area.setFixedHeight(12)
-        area.setStyleSheet("QFrame { background: transparent; }")
+        area.setStyleSheet(
+            "QFrame { background: transparent; border: none; }"
+        )
         area.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
@@ -447,11 +451,20 @@ class DashboardFrame(BaseFrame):
     # ---------------------------------------------------------
     def _card(self, min_h: int = 0):
         card = QFrame(self.scroll_content)
+        card.setObjectName("DashCard")
         card.setStyleSheet(f"""
-            QFrame {{
+            QFrame#DashCard {{
                 background-color: {CARD_BG};
                 border: 1px solid {CARD_BORDER};
                 border-radius: 12px;
+            }}
+            QFrame#DashCard QFrame {{
+                border: none;
+                background: transparent;
+            }}
+            QFrame#DashCard QLabel {{
+                border: none;
+                background: transparent;
             }}
         """)
         if min_h:
@@ -471,7 +484,7 @@ class DashboardFrame(BaseFrame):
 
     def _stat(self, label, value, color=TEXT, sub=""):
         w = QFrame()
-        w.setStyleSheet("QFrame { background: transparent; }")
+        w.setStyleSheet("QFrame { background: transparent; border: none; }")
         lay = QVBoxLayout(w)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(3)
@@ -556,6 +569,7 @@ class DashboardFrame(BaseFrame):
         self._build_zones_pie(s)
         self._build_dynamics(gm)
         self._build_all_zones(gm)
+        self._build_rechecks(gm)
         self._build_time_finance(s, gm)
         self._build_cash_quality(s)
 
@@ -743,7 +757,11 @@ class DashboardFrame(BaseFrame):
         for h in hist:
             d = h.get("date", "")
             short = d[:5] if d else ""
-            points.append((short, h.get("grand_total", 0) or 0))
+            # summary_history отдаёт поле "total", не "grand_total"
+            val = h.get("total")
+            if val is None:
+                val = h.get("grand_total")
+            points.append((short, val or 0))
 
         chart = LineChart()
         chart.set_points(points)
@@ -777,6 +795,43 @@ class DashboardFrame(BaseFrame):
         self.main_layout.addWidget(card)
 
     # ---------------------------------------------------------
+    # ---------------------------------------------------------
+    def _build_rechecks(self, gm):
+        """Отдельный блок: «Перепроверки расхождений» по зонам и итогам."""
+        try:
+            events = top_other_events(gm, limit=100)
+        except Exception:
+            events = []
+
+        rechecks = [(name, val) for name, val in events
+                    if "перепроверк" in (name or "").lower()]
+
+        if not rechecks:
+            return
+
+        card, lay = self._card()
+        lay.addWidget(self._section("ПЕРЕПРОВЕРКИ"))
+
+        # Итоговая сумма
+        total = sum(v for _, v in rechecks)
+        total_lbl = QLabel(f"Итого: {_fmt_money(total)}")
+        total_lbl.setStyleSheet(
+            f"color: {_type_color(total)}; font-size: 16px; "
+            f"font-weight: bold; background: transparent;"
+        )
+        lay.addWidget(total_lbl)
+
+        # Бары по перепроверкам
+        max_val = max(abs(v) for _, v in rechecks) or 1
+        for name, val in rechecks:
+            lay.addWidget(HBar(
+                name, val, max_val,
+                color=WARN,
+                value_text=f"{_fmt_money(val)}  ({_type_word(val)})",
+            ))
+
+        self.main_layout.addWidget(card)
+
     def _build_time_finance(self, s, gm):
         row = QHBoxLayout()
         row.setSpacing(18)
