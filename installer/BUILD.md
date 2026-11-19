@@ -79,7 +79,9 @@ onefile распаковывается в `%TEMP%` при каждом запу�
 или из командной строки:
 
 ```powershell
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\CoreV3.iss
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\CoreV3.iss
+# или, если установлен в Program Files:
+# & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\CoreV3.iss
 ```
 
 Результат: `installer\Output\CoreV3_Setup_3.1.exe`
@@ -142,6 +144,39 @@ cd dist\CoreV3
 
 Если окна нет, а ошибка есть — смените в `CoreV3.spec` `console=False` на `console=True`,
 пересоберите и посмотрите вывод.
+
+### В собранной версии письма Outlook не собираются
+
+В логе:
+
+```text
+fetch_emails: пропускаю письмо — No module named 'win32timezone'
+fetch_emails: получено 0 писем (просканировано 1190, папок 40)
+```
+
+**Причина:** `win32timezone` нужен для разбора дат писем, но PyInstaller его
+не находит — модуль лежит в `site-packages/win32/lib`, а не в обычном пакете.
+
+**Решение:** в `CoreV3.spec` модуль добавлен двумя способами:
+- в `hiddenimports` как `"win32timezone"`;
+- как файл данных в `_internal/win32/lib/win32timezone.py`.
+
+Если ошибка вернулась — проверьте, что в `dist\CoreV3\_internal\win32\lib\`
+лежит `win32timezone.py`.
+
+### Погода не работает в собранной версии
+
+В логе:
+
+```text
+PYWV2_ERR_DLL_NOT_FOUND — Could not find x64 proxy-layer DLL
+```
+
+**Причина:** `pywv2` держит нативные DLL (`wv2_gcc_x64.dll`, `wv2_tcc_x64.dll`)
+вне пакета, PyInstaller их не захватывает.
+
+**Решение:** в `CoreV3.spec` папка `pywv2/bin` добавляется в `datas`.
+Проверка: `dist\CoreV3\_internal\pywv2in\` должна содержать обе DLL.
 
 ### Антивирус ругается на установщик
 

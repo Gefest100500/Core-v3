@@ -29,8 +29,12 @@
     │   │   │                       AnimatedPlaceholderEntry, style_popup
     │   │   ├── dialogs.py          CustomMessageBox, ask_confirm
     │   │   ├── calculator_dialog.py Мини-калькулятор (тёмная шапка)
-    │   │   └── notepad_dialog.py   Блокнот (заметки в data/notes/,
-    │   │                           кнопки «Новая», «Удалить», кастомное подтверждение)
+    │   │   ├── notepad_dialog.py   Блокнот (заметки в data/notes/,
+    │   │   │                       кнопки «Новая», «Удалить», кастомное подтверждение)
+    │   │   ├── files_dialog.py     Внутренний файловый менеджер (drag-out, Ctrl+C)
+    │   │   ├── weather_widget.py   Виджет погоды на Главной (pywv2 + wttr.in)
+    │   │   ├── wizard_dialog.py    Мастер первого запуска
+    │   │   └── test_dialog.py      Диалог проверки соединений
     │   │
     │   └── frames/                 Вкладки (по одной на модуль)
     │       ├── base_frame.py       Базовый класс: run_in_thread, run_on_ui,
@@ -50,6 +54,8 @@
     │       ├── tsd_frame.py        ТСД (QR-коды)
     │       ├── dashboard_frame.py  Дашборд ГМ (открывается из Архива)
     │       ├── archive_frame.py    Архив инвентаризаций
+    │       ├── guide_tab.py        Регламент (инструкция по инвентаризации)
+    │       ├── settings_frame.py   Настройки (мастер, логи, проверка JSON)
     │       ├── info_frame.py       Информация
     │       └── utils_frame.py      Меню утилит
     │
@@ -61,6 +67,8 @@
     │   ├── comments_builder.py     Логика шаблонов комментариев
     │   ├── printer_manager.py      Управление принтерами
     │   ├── gm_map.py               Координаты ГМ, геокодинг
+    │   ├── geo_helper.py           IP → код ГМ → город → координаты (погода)
+    │   ├── log_sender.py           Отправка логов по почте
     │   ├── guide_manager.py        Загрузка, рендер и поиск по регламенту
     │   ├── inventory_helper.py     Помощник инвентаризации
     │   ├── timesheet.py            Логика табеля (load/save, формат АСУЗ)
