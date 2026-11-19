@@ -131,7 +131,10 @@ class ArchiveFrame(BaseFrame):
         header_row.addWidget(title, 1)
 
         self.count_label = QLabel("", self)
-        self.count_label.setFont(self.FONTS['small'])
+        self.count_label.setFont(self.FONTS['label'])
+        self.count_label.setStyleSheet(
+            f"color: {self.COLORS.get('text_dim', '#A0A0A0')}; font-size: 13px;"
+        )
         self.count_label.setStyleSheet(
             f"color: {self.COLORS.get('text_dim', '#A0A0A0')};"
         )
@@ -257,16 +260,18 @@ class ArchiveFrame(BaseFrame):
         # --- Верхняя строка: ГМ ---
         gm_label = QLabel(f"ГМ {gm_code} — {gm_name}", card)
         gm_label.setFont(self.FONTS['subtitle'])
-        gm_label.setStyleSheet("background: transparent;")
+        gm_label.setStyleSheet(
+            "background: transparent; font-size: 17px; font-weight: bold;"
+        )
         card.layout().addWidget(gm_label)
 
         # --- Адрес ---
         if address:
             addr_label = QLabel(address, card)
-            addr_label.setFont(self.FONTS['small'])
+            addr_label.setFont(self.FONTS['label'])
             addr_label.setStyleSheet(
                 f"color: {self.COLORS.get('text_dim', '#A0A0A0')}; "
-                f"background: transparent;"
+                f"background: transparent; font-size: 13px;"
             )
             card.layout().addWidget(addr_label)
 
@@ -285,16 +290,16 @@ class ArchiveFrame(BaseFrame):
             f"•   Итог: {amount_text}"
         )
         info_label = QLabel(info, card)
-        info_label.setFont(self.FONTS['small'])
+        info_label.setFont(self.FONTS['label'])
         info_label.setStyleSheet(
-            f"color: {self.COLORS.get('text_dim', '#A0A0A0')}; "
-            f"background: transparent;"
+            f"color: {self.COLORS.get('text', '#E0E0E0')}; "
+            f"background: transparent; font-size: 14px;"
         )
         card.layout().addWidget(info_label)
 
         # --- Подсказка ---
         hint = QLabel("Нажмите, чтобы открыть дашборд", card)
-        hint.setFont(self.FONTS['small'])
+        hint.setFont(self.FONTS['label'])
         hint.setStyleSheet(
             f"color: {self.COLORS.get('text_dim', '#666666')}; "
             f"background: transparent; padding-top: 4px;"

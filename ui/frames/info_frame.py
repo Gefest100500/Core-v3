@@ -16,7 +16,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QTabWidget, QTextBrowser, QApplication,
-    QListWidget, QListWidgetItem, QSplitter
+    QListWidget, QListWidgetItem, QSplitter, QScrollArea
 )
 
 from core import __version__
@@ -567,14 +567,32 @@ class InfoFrame(BaseFrame):
 
     def _build_about_tab(self):
         tab = QWidget()
-        layout = QVBoxLayout(tab)
+        outer = QVBoxLayout(tab)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # Прокрутка: карточка «О программе» выше окна, без неё низ обрезался
+        scroll = QScrollArea(tab)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        scroll.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+        )
+
+        container = QWidget()
+        container.setStyleSheet("QWidget { background: transparent; }")
+
+        layout = QVBoxLayout(container)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(15)
         layout.setAlignment(
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter
         )
 
-        about_card = create_card(tab)
+        about_card = create_card(container)
         about_card.setMaximumWidth(700)
 
         version_label = QLabel(APP_VERSION, about_card)
@@ -613,5 +631,8 @@ class InfoFrame(BaseFrame):
 
         layout.addWidget(about_card)
         layout.addStretch()
+
+        scroll.setWidget(container)
+        outer.addWidget(scroll, 1)
 
         self.tabs.addTab(tab, "О программе")
