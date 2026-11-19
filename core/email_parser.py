@@ -103,6 +103,111 @@ RE_FULL_WITHOUT_RM = re.compile(
     re.IGNORECASE,
 )
 
+# --- БЛОК ФИНАЛЬНОГО ПИСЬМА ---------------------------------------------
+
+# «Модуль суммы отклонений полной инвентаризации: 5 547 862,88 руб. в т.ч. Алкоголь 100 560,35 руб.»
+RE_MODULE_DEVIATION = re.compile(
+    r"Модуль\s+суммы\s+отклонений\s+полной\s+инвентаризации\s*:\s*"
+    r"(?P<amount>-?[\d\s\xa0]+(?:[\.,]\d+)?)\s*руб\.?"
+    r"(?:\s*в\s*т\.?\s*ч\.?\s*(?P<zone>[А-ЯЁ][\wА-ЯЁа-яё\s]+?)\s*"
+    r"(?P<zone_amount>-?[\d\s\xa0]+(?:[\.,]\d+)?)\s*руб)?",
+    re.IGNORECASE,
+)
+
+# «..., в т.ч. Алкоголь 39 657,01 руб. недостачей»
+RE_INLINE_ZONE = re.compile(
+    r"в\s*т\.?\s*ч\.?\s*(?P<zone>[А-ЯЁ][\wА-ЯЁа-яё\s]{2,30}?)\s*"
+    r"(?P<amount>-?[\d\s\xa0]+(?:[\.,]\d+)?)\s*руб\.?\s*"
+    r"(?P<type>недостач[а-я]*|излишк[а-я]*)?",
+    re.IGNORECASE,
+)
+
+# «Состав комиссии: Хисматуллин Руслан Ильдарович (Старший), Сильченко Алексей Сергеевич , ...»
+RE_COMMISSION = re.compile(
+    r"Состав\s+комиссии\s*:\s*(?P<body>.{5,500}?)(?:\.\s|\.$|$)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# «Формат ГМ: МС Лайт»
+RE_GM_FORMAT = re.compile(
+    r"Формат\s+ГМ\s*:\s*(?P<format>[^\n\.]{1,40})",
+    re.IGNORECASE,
+)
+
+# «Номер последнего учетного периода: 14»
+RE_LAST_PERIOD = re.compile(
+    r"Номер\s+последнего\s+уч[её]тного\s+периода\s*:\s*(?P<period>\d+)",
+    re.IGNORECASE,
+)
+
+# «Длительность интенсивного пересчета товара: 4 суток (Вариант Ж)»
+RE_DURATION_VARIANT = re.compile(
+    r"Длительность\s+интенсивного\s+пересчета\s+товара\s*:\s*"
+    r"(?P<days>\d+)\s*сут[а-я]*\s*\(\s*Вариант\s*(?P<variant>[^)]+)\)",
+    re.IGNORECASE,
+)
+
+# --- ФИНАНСЫ ЗА ПЕРИОД ---
+
+# «Продажи за период: 1 873 609 837,59 руб.»
+RE_SALES = re.compile(
+    r"Продажи\s+за\s+период\s*:\s*(?P<amount>-?[\d\s\xa0]+(?:[\.,]\d+)?)\s*руб",
+    re.IGNORECASE,
+)
+
+# «Сумма отклонений по списаниям: 69 040 064,90 руб. (3.68% объема продаж).»
+RE_WRITEOFF_DEVIATION = re.compile(
+    r"Сумма\s+отклонений\s+по\s+списаниям\s*:\s*"
+    r"(?P<amount>-?[\d\s\xa0]+(?:[\.,]\d+)?)\s*руб\.?"
+    r"(?:\s*\((?P<percent>[\d\.,]+)\s*%[^)]*\))?",
+    re.IGNORECASE,
+)
+
+# «Сумма отклонений по инвентаризациям: 11 210 151,68 руб. (0.60% объема продаж).»
+RE_INV_DEVIATION = re.compile(
+    r"Сумма\s+отклонений\s+по\s+инвентаризациям\s*:\s*"
+    r"(?P<amount>-?[\d\s\xa0]+(?:[\.,]\d+)?)\s*руб\.?"
+    r"(?:\s*\((?P<percent>[\d\.,]+)\s*%[^)]*\))?",
+    re.IGNORECASE,
+)
+
+# «Итого сумма отклонений за период (списания + инвентаризации): 80 250 216,58 руб. (4.28% ...)»
+RE_TOTAL_DEVIATION = re.compile(
+    r"Итого\s+сумма\s+отклонений\s+за\s+период[^:]*:\s*"
+    r"(?P<amount>-?[\d\s\xa0]+(?:[\.,]\d+)?)\s*руб\.?"
+    r"(?:\s*\((?P<percent>[\d\.,]+)\s*%[^)]*\))?",
+    re.IGNORECASE,
+)
+
+# --- КАССА ---
+
+# «Остаток ДС в ГК: 139 837,34 руб»  /  «Остаток ДС в ГК факт: 139 837,34 руб»
+RE_CASH_PLAN = re.compile(
+    r"Остаток\s+ДС\s+в\s+ГК\s*:\s*(?P<amount>-?[\d\s\xa0]+(?:[\.,]\d+)?)\s*руб",
+    re.IGNORECASE,
+)
+
+RE_CASH_FACT = re.compile(
+    r"Остаток\s+ДС\s+в\s+ГК\s+факт\s*:\s*(?P<amount>-?[\d\s\xa0]+(?:[\.,]\d+)?)\s*руб",
+    re.IGNORECASE,
+)
+
+# «Сумма инвентаризации наличных денежных средств ГК: Отклонений не выявлено.»
+RE_CASH_RESULT = re.compile(
+    r"Сумма\s+инвентаризации\s+наличных\s+денежных\s+средств\s+ГК\s*:\s*"
+    r"(?P<text>[^\n\.]{0,120})",
+    re.IGNORECASE,
+)
+
+# --- КАЧЕСТВО ---
+
+# «Качество технологий товародвижения ГМ: 85.9% (высокое)»
+RE_QUALITY = re.compile(
+    r"Качество\s+технологий\s+товародвижения\s+ГМ\s*:\s*"
+    r"(?P<percent>[\d\.,]+)\s*%\s*(?:\((?P<level>[^)]+)\))?",
+    re.IGNORECASE,
+)
+
 # Даты инвентаризации из шапки
 RE_DATE_START = re.compile(
     r"Дата\s+начала\s+инвентаризации\s+ГМ\s*:\s*(?P<date>\d{2}\.\d{2}\.\d{4})",
@@ -491,6 +596,173 @@ def _parse_comments(lines: List[str]) -> List[Dict[str, str]]:
 # =========================================================
 # ОСНОВНАЯ ФУНКЦИЯ
 # =========================================================
+# =========================================================
+# ФИНАЛЬНЫЙ БЛОК: детальные данные
+# =========================================================
+def _parse_final_details(text: str) -> Dict[str, Any]:
+    """Извлекает всё, что есть в финальном письме сверх итоговых сумм.
+
+    Возвращает:
+        {
+            "commission": [{"name": "...", "role": "Старший"|""}],
+            "gm_format": "МС Лайт",
+            "last_period": 14,
+            "duration_text": "4 суток (Вариант Ж)",
+            "module_deviation": {"amount": float, "zone": str, "zone_amount": float},
+            "zones": [{"name": str, "amount": float, "type": str}],
+            "finance": {
+                "sales": float,
+                "writeoff": {"amount": float, "percent": float},
+                "inventory": {"amount": float, "percent": float},
+                "total": {"amount": float, "percent": float},
+            },
+            "cash": {"plan": float, "fact": float, "result": str},
+            "quality": {"percent": float, "level": str},
+        }
+    """
+    result: Dict[str, Any] = {
+        "commission": [],
+        "gm_format": "",
+        "last_period": None,
+        "duration_text": "",
+        "module_deviation": None,
+        "zones": [],
+        "finance": {
+            "sales": None,
+            "writeoff": None,
+            "inventory": None,
+            "total": None,
+        },
+        "cash": {"plan": None, "fact": None, "result": ""},
+        "quality": None,
+    }
+
+    # --- Комиссия ---
+    m = RE_COMMISSION.search(text)
+    if m:
+        body = m.group("body")
+        for raw in re.split(r",", body):
+            part = raw.strip()
+            if not part:
+                continue
+            role = ""
+            rm = re.search(r"\(([^)]+)\)", part)
+            if rm:
+                role = rm.group(1).strip()
+                part = part[:rm.start()].strip()
+            # отрезаем переносы строк и начало следующего раздела («2»)
+            # отрезаем переносы строк и начало следующего раздела
+            part = re.split(r"[\n\r]", part, 1)[0].strip(" .,")
+            part = re.sub(r"\s{2,}", " ", part)
+            if part and not part.isdigit():
+                result["commission"].append({"name": part, "role": role})
+
+    # --- Формат ГМ ---
+    m = RE_GM_FORMAT.search(text)
+    if m:
+        result["gm_format"] = m.group("format").strip().rstrip(".")
+
+    # --- Учетный период ---
+    m = RE_LAST_PERIOD.search(text)
+    if m:
+        try:
+            result["last_period"] = int(m.group("period"))
+        except ValueError:
+            pass
+
+    # --- Длительность и вариант (текстовое представление) ---
+    m = RE_DURATION_VARIANT.search(text)
+    if m:
+        result["duration_text"] = (
+            f'{m.group("days")} суток (Вариант {m.group("variant").strip()})'
+        )
+
+    # --- Модуль отклонений + зона ---
+    m = RE_MODULE_DEVIATION.search(text)
+    if m:
+        amount = _parse_amount(m.group("amount"))
+        zone = (m.group("zone") or "").strip()
+        zone_amount = _parse_amount(m.group("zone_amount") or "")
+        if amount is not None:
+            result["module_deviation"] = {
+                "amount": amount,
+                "zone": zone,
+                "zone_amount": zone_amount,
+            }
+
+    # --- Зоны (все вхождения «в т.ч. Название СУММА руб» ) ---
+    for m in RE_INLINE_ZONE.finditer(text):
+        zone = m.group("zone").strip()
+        amount = _parse_amount(m.group("amount"))
+        if amount is None or not zone:
+            continue
+        result["zones"].append({
+            "name": zone,
+            "amount": amount,
+            "type": (m.group("type") or "").strip().lower(),
+        })
+
+    # --- Финансы ---
+    m = RE_SALES.search(text)
+    if m:
+        result["finance"]["sales"] = _parse_amount(m.group("amount"))
+
+    m = RE_WRITEOFF_DEVIATION.search(text)
+    if m:
+        result["finance"]["writeoff"] = {
+            "amount": _parse_amount(m.group("amount")),
+            "percent": _parse_float(m.group("percent")),
+        }
+
+    m = RE_INV_DEVIATION.search(text)
+    if m:
+        result["finance"]["inventory"] = {
+            "amount": _parse_amount(m.group("amount")),
+            "percent": _parse_float(m.group("percent")),
+        }
+
+    m = RE_TOTAL_DEVIATION.search(text)
+    if m:
+        result["finance"]["total"] = {
+            "amount": _parse_amount(m.group("amount")),
+            "percent": _parse_float(m.group("percent")),
+        }
+
+    # --- Касса ---
+    m = RE_CASH_PLAN.search(text)
+    if m:
+        result["cash"]["plan"] = _parse_amount(m.group("amount"))
+
+    m = RE_CASH_FACT.search(text)
+    if m:
+        result["cash"]["fact"] = _parse_amount(m.group("amount"))
+
+    m = RE_CASH_RESULT.search(text)
+    if m:
+        result["cash"]["result"] = m.group("text").strip().rstrip(".")
+
+    # --- Качество ---
+    m = RE_QUALITY.search(text)
+    if m:
+        result["quality"] = {
+            "percent": _parse_float(m.group("percent")),
+            "level": (m.group("level") or "").strip(),
+        }
+
+    return result
+
+
+def _parse_float(raw: Optional[str]) -> Optional[float]:
+    """Парсит число с запятой или точкой. Возвращает None при неудаче."""
+    if raw is None:
+        return None
+    s = str(raw).strip().replace("\xa0", " ").replace(" ", "").replace(",", ".")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
 def parse_email_body(body: str, subject: str = "") -> Dict[str, Any]:
     """Парсит тело письма от Krs_gk_gm_otchet@magnit.ru."""
     warnings: List[str] = []
@@ -519,6 +791,7 @@ def parse_email_body(body: str, subject: str = "") -> Dict[str, Any]:
             "events": [],
             "time_log": [],
             "comments": [],
+            "final_details": {},
             "parse_warnings": ["Тело письма пустое"],
         }
 
@@ -593,6 +866,11 @@ def parse_email_body(body: str, subject: str = "") -> Dict[str, Any]:
     if not totals["daily"]:
         warnings.append("totals.daily пуст")
 
+    # --- Детальные данные финального письма ---
+    final_details = {}
+    if is_final:
+        final_details = _parse_final_details(body)
+
     if is_final:
         warnings.append("обнаружено финальное письмо (is_final=True)")
 
@@ -661,6 +939,7 @@ def parse_email_body(body: str, subject: str = "") -> Dict[str, Any]:
         "events": events,
         "time_log": time_log,
         "comments": comments,
+        "final_details": final_details,
         "parse_warnings": warnings,
     }
 
