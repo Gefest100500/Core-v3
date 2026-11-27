@@ -20,7 +20,12 @@ from typing import Any, Callable, Dict, List, Optional
 
 from core.email_parser import parse_email_body
 from core.email_storage import save_emails_batch, load_emails
-from core.outlook_connector import fetch_emails, is_outlook_available, outlook_installed
+from core.outlook_connector import (
+    fetch_emails,
+    is_outlook_available,
+    outlook_allowed,
+    outlook_installed,
+)
 from utils.logger import log
 
 # Сколько дней брать, если настройка не задана или испорчена.
@@ -71,6 +76,11 @@ def collect_emails(
         "failed": 0,
         "details": [],
     }
+
+    if not outlook_allowed():
+        result["error"] = "Загрузка писем из Outlook отключена в настройках"
+        log.info(f"collect_emails: {result['error']}")
+        return result
 
     if not is_outlook_available():
         result["error"] = "Outlook недоступен (win32com не установлен)"

@@ -48,7 +48,16 @@ def send_log_to_dev(extra_info: str = "") -> Dict[str, Any]:
     Возвращает словарь с результатом.
     """
     result = {"success": False, "error": "", "file": ""}
-    
+
+    try:
+        from core.outlook_connector import outlook_allowed
+
+        if not outlook_allowed():
+            result["error"] = "Отправка логов через Outlook отключена в настройках"
+            return result
+    except Exception:
+        pass
+
     if not OUTLOOK_AVAILABLE:
         result["error"] = "Outlook недоступен (нет win32com)"
         return result

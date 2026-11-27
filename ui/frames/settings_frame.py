@@ -95,6 +95,15 @@ class SettingsFrame(BaseFrame):
         hint.setWordWrap(True)
         card_mail.layout().addWidget(hint)
 
+        # Выключатель почты: на машине без Outlook программа к нему не обращается
+        self.chk_outlook = QCheckBox("Загружать письма из Outlook")
+        self.chk_outlook.setFont(self.FONTS['small'])
+        self.chk_outlook.setStyleSheet(f"color: {self.COLORS.get('text', '#E0E0E0')};")
+        outlook_val = self._settings.value("outlook_enabled", "true")
+        self.chk_outlook.setChecked(str(outlook_val).lower() != "false")
+        self.chk_outlook.stateChanged.connect(self._save_outlook_setting)
+        card_mail.layout().addWidget(self.chk_outlook)
+
         root_layout.addWidget(card_mail)
 
         # --- Карточка 2: Папки и Терминал ---
@@ -270,14 +279,26 @@ class SettingsFrame(BaseFrame):
 
     def _run_test(self):
         results = []
-        
+
         outlook_app = None
         try:
-            import win32com.client
-            outlook_app = win32com.client.Dispatch("Outlook.Application")
-            results.append({"title": "Outlook", "status": "success", "message": "Подключение установлено"})
-        except Exception as e:
-            results.append({"title": "Outlook", "status": "error", "message": f"Ошибка: {str(e)[:50]}"})
+            from core.outlook_connector import outlook_allowed
+
+            if not outlook_allowed():
+                results.append({"title": "Outlook", "status": "info",
+                                "message": "Отключён в настройках"})
+                raise StopIteration
+        except StopIteration:
+            pass
+        except Exception:
+            pass
+        else:
+            try:
+                import win32com.client
+                outlook_app = win32com.client.Dispatch("Outlook.Application")
+                results.append({"title": "Outlook", "status": "success", "message": "Подключение установлено"})
+            except Exception as e:
+                results.append({"title": "Outlook", "status": "error", "message": f"Ошибка: {str(e)[:50]}"})
 
         reports_path = self._settings.value("reports_folder", "")
         if reports_path and os.path.isdir(reports_path):
@@ -329,10 +350,10 @@ class SettingsFrame(BaseFrame):
 
         # Без Outlook отправка невозможна: не пытаемся и не ждём таймаут COM.
         try:
-            from core.outlook_connector import outlook_installed
+            from core.outlook_connector import outlook_allowed, outlook_installed
 
-            if not outlook_installed():
-                log.info("settings_frame: Outlook не установлен — автоотправка лога пропущена")
+            if not outlook_allowed() or not outlook_installed():
+                log.info("settings_frame: Outlook отключён — автоотправка лога пропущена")
                 return
         except Exception:
             log.exception("settings_frame: не удалось проверить наличие Outlook")
@@ -355,6 +376,11 @@ class SettingsFrame(BaseFrame):
     def _save_auto_log_setting(self, state):
         val = "true" if state == 2 else "false"
         self._settings.setValue("auto_log_enabled", val)
+
+    def _save_outlook_setting(self, state):
+        val = "true" if state == 2 else "false"
+        self._settings.setValue("outlook_enabled", val)
+        log.info(f"settings_frame: загрузка писем из Outlook — {val}")
 
     def _save_settings(self):
         email = self.input_email.text().strip()

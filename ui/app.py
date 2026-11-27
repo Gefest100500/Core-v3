@@ -206,7 +206,13 @@ class AuditApp(QMainWindow):
         # Outlook может быть не установлен (или не настроен) — это не повод
         # падать или ждать дважды по две минуты. Проверяем заранее и идём дальше.
         try:
-            from core.outlook_connector import outlook_installed
+            from core.outlook_connector import outlook_allowed, outlook_installed
+
+            if not outlook_allowed():
+                log.info("auto_fetch: загрузка писем отключена в настройках — старт без почты")
+                self._update_splash("Готово (без почты)", 100)
+                QTimer.singleShot(0, self._on_init_finished)
+                return
 
             if not outlook_installed():
                 log.warning("auto_fetch: Outlook не установлен — старт без почты")

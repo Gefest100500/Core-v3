@@ -30,6 +30,7 @@
 - Логирование: на уровне debug пишем, какие папки обошли и сколько
   писем в каждой; на уровне info — итог.
 """
+import os
 import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -170,6 +171,10 @@ def fetch_emails(
     """
     if not OUTLOOK_AVAILABLE:
         log.warning("fetch_emails: Outlook недоступен")
+        return []
+
+    if not outlook_allowed():
+        log.info("fetch_emails: Outlook отключён в настройках — пропуск")
         return []
 
     try:
@@ -347,6 +352,27 @@ def extract_gm_name(subject: str) -> str:
 
 def is_outlook_available() -> bool:
     return OUTLOOK_AVAILABLE
+
+
+def outlook_allowed() -> bool:
+    """Разрешено ли на этой машине обращаться к Outlook вообще.
+
+    Выключается галочкой «Загружать письма из Outlook» в настройках
+    (QSettings, персонально для компьютера) или переменной окружения
+    CORE_OUTLOOK_DISABLED=1 — например, на машине, где Outlook нет.
+    """
+    env = os.environ.get("CORE_OUTLOOK_DISABLED", "").strip().lower()
+    if env in ("1", "true", "yes", "on"):
+        return False
+
+    try:
+        from PyQt6.QtCore import QSettings
+
+        settings = QSettings("SilchenkoAleksey", "CoreV3")
+        value = str(settings.value("outlook_enabled", "true")).strip().lower()
+        return value not in ("false", "0", "no", "off")
+    except Exception:
+        return True
 
 
 def outlook_installed() -> bool:
