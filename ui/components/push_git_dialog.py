@@ -315,10 +315,33 @@ class PushWorker(QThread):
             _run_git(["pull", "--rebase", "origin", branch], clone_dir, timeout=180)
 
         # --- 1.5. Очистка репозитория (если просили) ---
+        cleared = 0
         if self.clear_first:
             self.progress.emit("Очищаю репозиторий…")
             cleared = self._clear_repo(clone_dir)
             self.progress.emit(f"Удалено файлов: {cleared}")
+
+        # --- 1.6. Только очистка (без загрузки файлов) ---
+        if not self.files:
+            if cleared == 0:
+                self.finished_ok.emit(True, "Репозиторий уже пуст — очищать нечего")
+                return
+
+            _run_git(["branch", "-M", branch], clone_dir)
+            self.progress.emit("Отправляю очистку на GitHub…")
+            code, out, err = _run_git(
+                ["push", "-u", "origin", branch], clone_dir, timeout=180
+            )
+            if code != 0:
+                self.finished_ok.emit(False, f"git push:\n{err or out}")
+                return
+
+            self.progress.emit("Готово")
+            self.finished_ok.emit(
+                True,
+                f"Репозиторий очищен. Удалено файлов: {cleared}",
+            )
+            return
 
         # --- 2. Копирование ---
         copied = []
@@ -592,6 +615,14 @@ class PushGitDialog(QDialog):
         btn_row.setSpacing(10)
         btn_row.addStretch()
 
+        self.btn_clear = QPushButton("Очистить репозиторий", self)
+        self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clear.setMinimumHeight(40)
+        self.btn_clear.setMinimumWidth(180)
+        self.btn_clear.setStyleSheet(self._btn_style())
+        self.btn_clear.clicked.connect(self._start_clear)
+        btn_row.addWidget(self.btn_clear)
+
         self.btn_push = QPushButton("Отправить в Git", self)
         self.btn_push.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_push.setMinimumHeight(40)
@@ -734,6 +765,46 @@ class PushGitDialog(QDialog):
     # ---------------------------------------------------------
     # PUSH
     # ---------------------------------------------------------
+    def _start_clear(self):
+        """Очистка репозитория: удалить все файлы, закоммитить и запушить."""
+        if self._busy:
+            return
+
+        from ui.components.dialogs import CustomMessageBox
+        c = self._colors
+        answer = CustomMessageBox(
+            self,
+            "Очистить репозиторий?",
+            "Все файлы в репозитории будут удалены, а очистка отправлена на GitHub."
+            + chr(10) + chr(10)
+            + "Локальный клон и настройки останутся на месте. Отменить после отправки нельзя.",
+            "warning",
+            buttons=[("Очистить", "primary"), ("Отмена", "ghost")],
+            bg=c["bg"], card=c["card"], text=c["text"],
+            button=c["button"], hover=c["hover"],
+            text_dim=c["text_dim"], border=c["border"],
+        ).exec()
+
+        if answer != 0:
+            return
+
+        self.cfg["repo_url"] = self.edit_repo.text().strip()
+        self.cfg["clone_dir"] = self.edit_clone.text().strip()
+        self.cfg["source_dir"] = self.edit_source.text().strip()
+        save_settings(self.cfg)
+
+        self._busy = True
+        self.btn_push.setEnabled(False)
+        self.btn_clear.setEnabled(False)
+        self.btn_clear.setText("Очищаю…")
+        self.log_view.clear()
+        self._log("Начало очистки репозитория")
+
+        self._worker = PushWorker(self.cfg, [], clear_first=True, parent=self)
+        self._worker.progress.connect(self._log)
+        self._worker.finished_ok.connect(self._on_push_done)
+        self._worker.start()
+
     def _start_push(self):
         files = self._selected_files()
         if not files:
@@ -793,6 +864,8 @@ class PushGitDialog(QDialog):
     def _on_push_done(self, ok: bool, message: str):
         self._busy = False
         self.btn_push.setText("Отправить в Git")
+        self.btn_clear.setText("Очистить репозиторий")
+        self.btn_clear.setEnabled(True)
         self._update_count()
 
         color = self._colors["success"] if ok else self._colors["error"]
