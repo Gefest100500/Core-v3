@@ -50,16 +50,61 @@ def settings_path() -> str:
 
 
 def default_settings() -> dict:
-    desktop = os.path.join(
-        os.environ.get("USERPROFILE", os.path.expanduser("~")),
-        "Nextcloud", "Desktop", "Git",
-    )
+    home = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+    # Рабочая папка выгрузок: сначала Nextcloud (как на рабочем ПК), потом Рабочий стол
+    candidates = [
+        os.path.join(home, "Nextcloud", "Desktop", "Git"),
+        os.path.join(home, "Desktop", "Git"),
+        os.path.join(home, "Рабочий стол", "Git"),
+    ]
+    source_dir = next((p for p in candidates if os.path.isdir(p)), candidates[0])
     return {
-        "repo_url": "git@github.com:Gefest100500/tmp-transfer.git",
+        "repo_url": "https://github.com/Gefest100500/tmp-transfer.git",
         "clone_dir": os.path.join(os.path.dirname(get_user_data_dir()), "tmp-transfer"),
-        "source_dir": desktop,
+        "source_dir": source_dir,
         "branch": "main",
     }
+
+
+# =========================================================
+# ТОКЕН
+# =========================================================
+TOKEN_FILE = "git_push_token.txt"
+
+
+def _read_token() -> str:
+    """Токен GitHub: переменная окружения или data/git_push_token.txt.
+
+    В коде токена нет намеренно: репозиторий публичный.
+    """
+    env = os.environ.get("CORE_GIT_TOKEN", "").strip()
+    if env:
+        return env
+
+    path = os.path.join(get_user_data_dir(), TOKEN_FILE)
+    try:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8-sig") as f:
+                return f.read().strip()
+    except (IOError, OSError, UnicodeDecodeError) as e:
+        log.warning(f"push_git: не удалось прочитать токен: {e}")
+    return ""
+
+
+def resolve_repo_url(url: str) -> str:
+    """Подставляет токен в https-адрес GitHub, если его там ещё нет."""
+    url = (url or "").strip()
+    if not url or "@" in url.split("//")[-1].split("/")[0]:
+        return url
+    if url.startswith("https://github.com/"):
+        token = _read_token()
+        if token:
+            return url.replace(
+                "https://github.com/",
+                f"https://x-access-token:{token}@github.com/",
+                1,
+            )
+    return url
 
 
 def load_settings() -> dict:
@@ -215,9 +260,24 @@ class PushWorker(QThread):
         cfg = self.cfg
         clone_dir = cfg["clone_dir"]
         branch = cfg.get("branch") or "main"
-        repo_url = cfg["repo_url"]
+        repo_url = resolve_repo_url(cfg["repo_url"])
 
         # --- 0. Проверки до работы ---
+        raw_url = (cfg.get("repo_url") or "").strip()
+        if (
+            raw_url.startswith("https://github.com/")
+            and "@" not in raw_url.split("//")[-1].split("/")[0]
+            and not _read_token()
+        ):
+            self.finished_ok.emit(
+                False,
+                "Для https-адреса GitHub нужен токен.\n\n"
+                "Положите токен в файл data\\git_push_token.txt "
+                "(или задайте переменную CORE_GIT_TOKEN) — "
+                "либо вставьте адрес сразу с токеном.",
+            )
+            return
+
         if repo_url.startswith("git@") and not _ssh_keys_present():
             self.finished_ok.emit(
                 False,
@@ -438,7 +498,8 @@ class PushGitDialog(QDialog):
         repo_layout.addWidget(self.edit_repo)
 
         hint_repo = QLabel(
-            "SSH требует ключ в GitHub. Если ключа нет — используйте https-адрес с токеном.",
+            "SSH требует ключ в GitHub. Для https токен берётся из data\\git_push_token.txt "
+            "или переменной CORE_GIT_TOKEN.",
             repo_card,
         )
         hint_repo.setWordWrap(True)
