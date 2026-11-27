@@ -68,9 +68,10 @@ def load_settings() -> dict:
     if not os.path.isfile(path):
         return defaults
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        # utf-8-sig: файл могли сохранить в Блокноте — тогда в начале BOM
+        with open(path, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
-    except (json.JSONDecodeError, IOError, OSError) as e:
+    except (json.JSONDecodeError, IOError, OSError, UnicodeDecodeError) as e:
         log.warning(f"push_git: не удалось прочитать настройки: {e}")
         return defaults
     return {**defaults, **data}
@@ -89,11 +90,41 @@ def save_settings(cfg: dict) -> bool:
 # =========================================================
 # GIT
 # =========================================================
+def _git_exe() -> str:
+    """Путь к git: из PATH, иначе — типовые места установки."""
+    found = shutil.which("git")
+    if found:
+        return found
+    candidates = [
+        r"C:\Program Files\Git\cmd\git.exe",
+        r"C:\Program Files (x86)\Git\cmd\git.exe",
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Git", "cmd", "git.exe"),
+    ]
+    for path in candidates:
+        if path and os.path.isfile(path):
+            return path
+    return "git"
+
+
+def _ssh_keys_present() -> bool:
+    ssh_dir = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), ".ssh")
+    if not os.path.isdir(ssh_dir):
+        return False
+    try:
+        names = os.listdir(ssh_dir)
+    except OSError:
+        return False
+    return any(
+        n in ("id_rsa", "id_ed25519", "id_ecdsa", "id_dsa") or n.endswith(".pub")
+        for n in names
+    )
+
+
 def _run_git(args: list[str], cwd: str, timeout: int = 120):
     """Запускает git. Возвращает (код, stdout, stderr)."""
     try:
         proc = subprocess.run(
-            ["git"] + args,
+            [_git_exe()] + args,
             cwd=cwd,
             capture_output=True,
             text=True,
@@ -106,7 +137,7 @@ def _run_git(args: list[str], cwd: str, timeout: int = 120):
     except subprocess.TimeoutExpired:
         return -1, "", "Таймаут выполнения git"
     except FileNotFoundError:
-        return -2, "", "git не найден в PATH"
+        return -2, "", "git не найден. Установите Git for Windows или добавьте его в PATH"
     except Exception as e:
         return -3, "", f"Ошибка запуска git: {e}"
 
@@ -130,6 +161,17 @@ class PushWorker(QThread):
         except Exception as e:
             log.exception("push_git: ошибка")
             self.finished_ok.emit(False, f"Ошибка: {e}")
+
+    def _commit(self, clone_dir: str, message: str):
+        """Коммит с явным автором: иначе git падает, если не настроен user.email."""
+        return _run_git(
+            [
+                "-c", "user.name=Core V3",
+                "-c", "user.email=core@local",
+                "commit", "-m", message,
+            ],
+            clone_dir,
+        )
 
     def _clear_repo(self, clone_dir: str) -> int:
         """Удаляет все файлы из репозитория, кроме .git.
@@ -166,10 +208,7 @@ class PushWorker(QThread):
 
         # Коммит очистки — чтобы история была честной
         stamp = datetime.now().strftime("%d.%m.%Y %H:%M")
-        _run_git(
-            ["commit", "-m", f"Очистка репозитория перед новой выгрузкой ({stamp})"],
-            clone_dir,
-        )
+        self._commit(clone_dir, f"Очистка репозитория перед новой выгрузкой ({stamp})")
         return removed
 
     def _do_push(self):
@@ -177,6 +216,25 @@ class PushWorker(QThread):
         clone_dir = cfg["clone_dir"]
         branch = cfg.get("branch") or "main"
         repo_url = cfg["repo_url"]
+
+        # --- 0. Проверки до работы ---
+        if repo_url.startswith("git@") and not _ssh_keys_present():
+            self.finished_ok.emit(
+                False,
+                "Репозиторий указан по SSH (git@github.com:…), но SSH-ключ не найден.\n\n"
+                "Варианты:\n"
+                "• указать https-адрес вида https://<токен>@github.com/пользователь/репозиторий.git\n"
+                "• или настроить SSH-ключ и добавить ключ в GitHub.",
+            )
+            return
+
+        source_dir = cfg.get("source_dir") or ""
+        if source_dir and not os.path.isdir(source_dir):
+            self.finished_ok.emit(
+                False,
+                f"Папка с файлами не найдена:\n{source_dir}\n\nУкажите её в настройках Push Git.",
+            )
+            return
 
         # --- 1. Клон ---
         if not os.path.isdir(os.path.join(clone_dir, ".git")):
@@ -234,11 +292,16 @@ class PushWorker(QThread):
         stamp = datetime.now().strftime("%d.%m.%Y %H:%M")
         msg = f"Добавлены файлы: {', '.join(copied)} ({stamp})"
 
-        code, out, err = _run_git(["commit", "-m", msg], clone_dir)
+        code, out, err = self._commit(clone_dir, msg)
         if code != 0:
             self.finished_ok.emit(False, f"git commit:\n{err or out}")
             return
         self.progress.emit("Изменения закоммичены")
+
+        # --- 3.5. Приводим имя ветки к нужному ---
+        # В пустом репозитории git создаёт master (или имя из init.defaultBranch),
+        # и push origin main падает с «src refspec main does not match any».
+        _run_git(["branch", "-M", branch], clone_dir)
 
         # --- 4. Push ---
         self.progress.emit("Отправляю на GitHub…")
@@ -368,8 +431,21 @@ class PushGitDialog(QDialog):
         repo_layout.addWidget(lbl_repo)
 
         self.edit_repo = QLineEdit(self.cfg["repo_url"], repo_card)
-        self.edit_repo.setReadOnly(True)
+        self.edit_repo.setPlaceholderText(
+            "git@github.com:user/repo.git или https://<токен>@github.com/user/repo.git"
+        )
+        self.edit_repo.textChanged.connect(self._on_paths_changed)
         repo_layout.addWidget(self.edit_repo)
+
+        hint_repo = QLabel(
+            "SSH требует ключ в GitHub. Если ключа нет — используйте https-адрес с токеном.",
+            repo_card,
+        )
+        hint_repo.setWordWrap(True)
+        hint_repo.setStyleSheet(
+            f"color: {self._colors['text_dim']}; font-size: 10px; border: none;"
+        )
+        repo_layout.addWidget(hint_repo)
 
         lbl_clone = QLabel("Локальный клон:", repo_card)
         lbl_clone.setStyleSheet(f"color: {self._colors['text_dim']}; font-size: 11px;")
@@ -507,6 +583,7 @@ class PushGitDialog(QDialog):
     # ФАЙЛЫ
     # ---------------------------------------------------------
     def _on_paths_changed(self):
+        self.cfg["repo_url"] = self.edit_repo.text().strip()
         self.cfg["clone_dir"] = self.edit_clone.text().strip()
         self.cfg["source_dir"] = self.edit_source.text().strip()
 
@@ -638,6 +715,7 @@ class PushGitDialog(QDialog):
         self.log_view.clear()
         self._log("Начало отправки")
 
+        self.cfg["repo_url"] = self.edit_repo.text().strip()
         self.cfg["clone_dir"] = self.edit_clone.text().strip()
         self.cfg["source_dir"] = self.edit_source.text().strip()
         save_settings(self.cfg)
