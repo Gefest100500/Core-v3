@@ -135,7 +135,7 @@ class ToolCard(QFrame):
                     border-color: {colors.get('text_dim', '#A0A0A0')};
                 }}
             """)
-            badge.clicked.connect(lambda: self.clicked.emit(self.tab_name))
+            badge.clicked.connect(self._emit_clicked)
             layout.addWidget(badge)
         else:
             btn = QPushButton("Открыть →", self)
@@ -153,12 +153,20 @@ class ToolCard(QFrame):
                     background-color: {colors.get('hover', '#B71C1C')};
                 }}
             """)
-            btn.clicked.connect(lambda: self.clicked.emit(self.tab_name))
+            btn.clicked.connect(self._emit_clicked)
             layout.addWidget(btn)
+
+    def _emit_clicked(self):
+        """Отдаём действие, если оно есть, иначе — имя вкладки.
+
+        У карточек-действий (Push Git) нет вкладки: раньше отправлялась пустая
+        строка, и нажатие ничего не открывало.
+        """
+        self.clicked.emit(self.action or self.tab_name)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit(self.tab_name)
+            self._emit_clicked()
         super().mousePressEvent(event)
 
 class UtilsFrame(BaseFrame):
