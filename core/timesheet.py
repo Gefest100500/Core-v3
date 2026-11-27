@@ -25,6 +25,7 @@ from datetime import date
 from typing import Optional
 
 from utils.file_utils import get_data_dir
+from utils.json_store import load_json
 from utils.logger import log
 
 # =========================================================
@@ -38,21 +39,20 @@ def _timesheet_path() -> str:
 # ЗАГРУЗКА / СОХРАНЕНИЕ
 # =========================================================
 def load_timesheet() -> dict:
-    """Загружает табель из JSON. Если файла нет — пустой словарь."""
+    """Загружает табель из JSON. Если файла нет — пустой словарь.
+
+    Повреждённый файл не роняет вкладку: сохраняем копию (.broken-*.bak)
+    и начинаем с пустого табеля.
+    """
     path = _timesheet_path()
     if not os.path.isfile(path):
         return {}
 
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            log.warning("timesheet.json должен быть словарём — игнорирую")
-            return {}
-        return data
-    except (json.JSONDecodeError, IOError) as e:
-        log.error(f"Ошибка чтения timesheet.json: {e}")
+    data = load_json(path, default={})
+    if not isinstance(data, dict):
+        log.warning("timesheet.json должен быть словарём — игнорирую")
         return {}
+    return data
 
 def save_timesheet(data: dict) -> bool:
     """Сохраняет табель в JSON. Атомарно (tmp + replace)."""

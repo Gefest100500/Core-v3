@@ -7,10 +7,11 @@
 - Все остальные цвета (info, warning, error, question) оставлены.
 """
 import ctypes
+import os
 import sys
 
-from PyQt6.QtCore import Qt, QTimer, QSize
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QTimer, QSize, QUrl
+from PyQt6.QtGui import QFont, QDesktopServices
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QApplication, QWidget, QLineEdit
@@ -201,6 +202,14 @@ class CustomMessageBox(QDialog):
             self.copy_btn.clicked.connect(self._copy_error)
             btn_layout.addWidget(self.copy_btn)
 
+            self.log_btn = QPushButton(" Открыть лог", container)
+            self.log_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.log_btn.setMinimumHeight(38)
+            self.log_btn.setMinimumWidth(140)
+            self.log_btn.setStyleSheet(self.copy_btn.styleSheet())
+            self.log_btn.clicked.connect(self._open_log)
+            btn_layout.addWidget(self.log_btn)
+
         self._button_widgets = []
         for btn_text in self._buttons:
             is_primary = btn_text in ("ОК", "Да")
@@ -322,6 +331,19 @@ class CustomMessageBox(QDialog):
                 self.move(x, y)
             except Exception:
                 pass
+
+    def _open_log(self):
+        """Открывает файл лога, чтобы можно было посмотреть подробности."""
+        try:
+            from utils.file_utils import get_logs_dir
+
+            path = os.path.join(get_logs_dir(), "core.log")
+            if os.path.isfile(path):
+                QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+            else:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(get_logs_dir()))
+        except Exception as e:
+            log.warning(f"Не удалось открыть лог: {e}")
 
     def _copy_error(self):
         try:

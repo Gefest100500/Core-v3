@@ -15,6 +15,7 @@
 - встроенный CSS документа собирается из палитры Core.
 """
 from collections import OrderedDict
+import os
 
 from PyQt6.QtCore import Qt, QUrl, QSettings
 from PyQt6.QtGui import (
@@ -24,11 +25,14 @@ from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTextBrowser, QSplitter, QListWidget, QListWidgetItem,
+    QPushButton, QFrame,
 )
+from PyQt6.QtGui import QDesktopServices
 
 from ui.frames.base_frame import BaseFrame
 from ui.components.widgets import SecondaryButton, StyledEntry
-from core.guide_manager import get_guide_manager
+from core.guide_manager import get_guide_manager, reset_guide_manager
+from utils.file_utils import get_data_dir
 from utils.logger import log
 
 SETTINGS_ORG = "SilchenkoAleksey"
@@ -104,6 +108,7 @@ class GuideTab(BaseFrame):
         self._setup_ui()
         self._build_tree()
         self._restore_last_section()
+        self._apply_guide_availability()
 
     # =========================================================
     # UI
@@ -118,7 +123,7 @@ class GuideTab(BaseFrame):
         header.setStyleSheet(f"color: {self.COLORS.get('text', '#E0E0E0')};")
         root.addWidget(header)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal, self)
+        self.splitter = splitter = QSplitter(Qt.Orientation.Horizontal, self)
         splitter.setHandleWidth(SPLITTER_WIDTH)
         splitter.setStyleSheet(
             f"QSplitter::handle {{ background-color: {self.COLORS.get('border', '#333333')}; }}"
@@ -243,6 +248,10 @@ class GuideTab(BaseFrame):
 
         root.addWidget(splitter, 1)
 
+        self.missing_notice = self._build_missing_notice()
+        self.missing_notice.hide()
+        root.addWidget(self.missing_notice, 1)
+
     def _apply_browser_theme(self):
         """Фон, рамка и полоса прокрутки браузера — в палитре Core."""
         card = self.COLORS.get("card", "#222222")
@@ -281,6 +290,115 @@ class GuideTab(BaseFrame):
     # =========================================================
     # ДЕРЕВО
     # =========================================================
+    # =========================================================
+    # НЕТ ФАЙЛА РЕГЛАМЕНТА
+    # =========================================================
+    # Какие файлы обычно переносят вместе с программой. Нужны для того,
+    # чтобы на новом ПК было видно, чего не хватает, а не просто пустой экран.
+    DATA_FILES = (
+        "guide.json",
+        "kv_reason_schema.json",
+        "gm_data.json",
+    )
+
+    def _build_missing_notice(self) -> QWidget:
+        card = self.COLORS.get("card", "#222222")
+        border = self.COLORS.get("border", "#333333")
+        text = self.COLORS.get("text", "#E0E0E0")
+        text_dim = self.COLORS.get("text_dim", "#A0A0A0")
+
+        notice = QFrame(self)
+        notice.setStyleSheet(
+            f"QFrame {{ background-color: {card}; border: 1px solid {border};"
+            f" border-radius: 10px; }}"
+        )
+        layout = QVBoxLayout(notice)
+        layout.setContentsMargins(28, 26, 28, 26)
+        layout.setSpacing(10)
+
+        title = QLabel("Регламент не найден", notice)
+        title.setStyleSheet(f"color: {text}; font-size: 17px; font-weight: bold;")
+        layout.addWidget(title)
+
+        body = QLabel(
+            "Файл data\\guide.json не найден. Обычно он лежит на рабочем компьютере "
+            "вместе с остальными данными программы.\n\n"
+            "Скопируйте папку data с машины, где регламент уже открывался, "
+            "или положите guide.json в папку «data» рядом с программой.",
+            notice,
+        )
+        body.setWordWrap(True)
+        body.setStyleSheet(f"color: {text_dim}; font-size: 13px;")
+        layout.addWidget(body)
+
+        self._missing_label = QLabel(notice)
+        self._missing_label.setWordWrap(True)
+        self._missing_label.setStyleSheet(f"color: {text_dim}; font-size: 12px;")
+        layout.addWidget(self._missing_label)
+
+        path_label = QLabel(f"Папка данных: {get_data_dir()}", notice)
+        path_label.setWordWrap(True)
+        path_label.setStyleSheet(f"color: {text_dim}; font-size: 12px;")
+        layout.addWidget(path_label)
+
+        buttons = QHBoxLayout()
+        buttons.setSpacing(10)
+
+        btn_open = SecondaryButton("Открыть папку data", notice)
+        btn_open.clicked.connect(self._open_data_dir)
+        buttons.addWidget(btn_open)
+
+        btn_reload = SecondaryButton("Проверить снова", notice)
+        btn_reload.clicked.connect(self._reload_guide)
+        buttons.addWidget(btn_reload)
+
+        buttons.addStretch()
+        layout.addLayout(buttons)
+        layout.addStretch()
+        return notice
+
+    def _missing_files(self) -> list[str]:
+        data_dir = get_data_dir()
+        return [n for n in self.DATA_FILES if not os.path.isfile(os.path.join(data_dir, n))]
+
+    def _apply_guide_availability(self):
+        """Показываем либо сам регламент, либо понятную карточку «файла нет»."""
+        try:
+            available = bool(self._guide.is_loaded() and self._guide.sections())
+        except Exception:
+            available = True
+
+        if available:
+            self.missing_notice.hide()
+            self.splitter.show()
+            return
+
+        missing = self._missing_files()
+        if missing:
+            self._missing_label.setText("Не хватает файлов: " + ", ".join(missing))
+        else:
+            self._missing_label.setText("Файл есть, но в нём нет разделов.")
+
+        self.splitter.hide()
+        self.missing_notice.show()
+
+    def _open_data_dir(self):
+        try:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(get_data_dir()))
+        except Exception:
+            log.exception("guide_tab: не удалось открыть папку данных")
+
+    def _reload_guide(self):
+        """Перечитывает guide.json: пригодится, если файл только что скопировали."""
+        try:
+            reset_guide_manager()
+            self._guide = get_guide_manager()
+            self._build_tree()
+            self._apply_guide_availability()
+            log.info("guide_tab: регламент перечитан")
+        except Exception:
+            log.exception("guide_tab: не удалось перечитать регламент")
+
     def _build_tree(self):
         """Строит список: жирные заголовки групп + пункты разделов."""
         self.list.clear()
