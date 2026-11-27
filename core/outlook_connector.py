@@ -33,7 +33,7 @@
 import os
 import re
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from utils.logger import log
 
@@ -350,3 +350,90 @@ def extract_gm_name(subject: str) -> str:
 
 def is_outlook_available() -> bool:
     return OUTLOOK_AVAILABLE
+
+
+def outlook_installed() -> bool:
+    """Есть ли Outlook на этом компьютере.
+
+    Проверяем наличие OUTLOOK.EXE по путям установки, а не только COM-класс:
+    класс может остаться в реестре после удаления Office.
+    """
+    if not OUTLOOK_AVAILABLE:
+        return False
+
+    import os
+
+    try:
+        import winreg
+    except Exception:
+        return False
+
+    subkeys = (
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\OUTLOOK.EXE",
+        r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\OUTLOOK.EXE",
+    )
+    for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+        for sub in subkeys:
+            try:
+                key = winreg.OpenKey(root, sub)
+            except OSError:
+                continue
+            try:
+                path = winreg.QueryValue(key, None)
+            except OSError:
+                path = ""
+            finally:
+                winreg.CloseKey(key)
+            if path:
+                exe = str(path).strip().strip('"')
+                if os.path.isfile(exe):
+                    return True
+    return False
+
+
+_PROBE_CODE = """
+import sys
+try:
+    import win32com.client
+    app = win32com.client.Dispatch("Outlook.Application")
+    app.GetNamespace("MAPI")
+    sys.exit(0)
+except Exception as e:
+    print(str(e))
+    sys.exit(1)
+"""
+
+
+def outlook_ready(timeout: float = 20.0) -> Tuple[bool, str]:
+    """Проверяет, что Outlook реально открывается, а не просто установлен.
+
+    Запускаем проверку отдельным процессом с таймаутом: Dispatch к Outlook
+    на неподнятом профиле умеет висеть минутами, и вешать поток приложения
+    из-за этого нельзя.
+    """
+    if not OUTLOOK_AVAILABLE:
+        return False, "Не установлен pywin32 — работа с Outlook недоступна"
+    if not outlook_installed():
+        return False, "Outlook на этом компьютере не найден"
+
+    import subprocess
+    import sys as _sys
+
+    try:
+        completed = subprocess.run(
+            [_sys.executable, "-c", _PROBE_CODE],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return False, f"Outlook не отвечает дольше {int(timeout)} секунд"
+    except Exception as e:
+        return False, f"Не удалось проверить Outlook: {e}"
+
+    if completed.returncode == 0:
+        return True, ""
+
+    details = (completed.stderr or completed.stdout or "").strip().splitlines()
+    reason = details[-1] if details else "Outlook не запускается"
+    return False, reason

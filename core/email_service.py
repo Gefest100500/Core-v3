@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from core.email_parser import parse_email_body
 from core.email_storage import save_emails_batch, load_emails, load_archive
-from core.outlook_connector import fetch_emails, is_outlook_available
+from core.outlook_connector import fetch_emails, is_outlook_available, outlook_installed
 from utils.logger import log
 
 
@@ -72,6 +72,11 @@ def collect_emails(
 
     if not is_outlook_available():
         result["error"] = "Outlook недоступен (win32com не установлен)"
+        log.warning(f"collect_emails: {result['error']}")
+        return result
+
+    if not outlook_installed():
+        result["error"] = "Outlook не установлен на этом компьютере"
         log.warning(f"collect_emails: {result['error']}")
         return result
 

@@ -43,10 +43,14 @@ class AuditApp(QMainWindow):
 
     _status_call = pyqtSignal(str)
     ready = pyqtSignal()
+    outlook_unavailable = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
 
+        self._outlook_warned = False
+        self._outlook_warning_text = ""
+        self._init_finished = False
         self.setWindowTitle("Core V3.0 - Корпоративный аудит")
         self.resize(1400, 900)
         self.setMinimumSize(1100, 700)
@@ -82,6 +86,7 @@ class AuditApp(QMainWindow):
         self._settings = QSettings(SETTINGS_ORG, SETTINGS_APP)
 
         self._status_call.connect(self._on_status_from_bg)
+        self.outlook_unavailable.connect(self._remember_outlook_warning)
 
         self._setup_ui()
         self._apply_style()
@@ -182,20 +187,44 @@ class AuditApp(QMainWindow):
         QTimer.singleShot(30, self._preload_next)
 
     def _start_email_fetch(self):
+        # Outlook может быть не установлен (или не настроен) — это не повод
+        # падать или ждать дважды по две минуты. Проверяем заранее и идём дальше.
+        try:
+            from core.outlook_connector import outlook_installed
+
+            if not outlook_installed():
+                log.warning("auto_fetch: Outlook не установлен — старт без почты")
+                self.outlook_unavailable.emit(
+                    "Outlook на этом компьютере не найден."
+                )
+                self._update_splash("Готово (без почты)", 100)
+                QTimer.singleShot(0, self._on_init_finished)
+                return
+        except Exception:
+            log.exception("auto_fetch: ошибка проверки Outlook")
+
         if not self._needs_sync():
             log.info("auto_fetch: пропуск — синхронизация была меньше 24 часов назад")
             self._update_splash("Готово", 100)
             QTimer.singleShot(0, self._on_init_finished)
             return
 
-        # Включаем анимацию бегущей строки
-        self._update_splash("Загрузка писем из Outlook...", 90, is_loading=True)
+        # Не держим сплэш на почте: сбор идёт в фоне, окно открывается сразу.
+        self._update_splash("Загрузка писем в фоне...", 100)
 
         import threading
 
         def _worker():
             try:
                 from core.email_service import collect_emails
+                from core.outlook_connector import outlook_ready
+
+                ready, reason = outlook_ready(timeout=20)
+                if not ready:
+                    log.warning(f"auto_fetch: Outlook недоступен — {reason}")
+                    self.outlook_unavailable.emit(reason)
+                    return
+
                 result = collect_emails(days_back=None)
                 log.info(
                     f"auto_fetch: fetched={result.get('fetched')}, "
@@ -205,23 +234,60 @@ class AuditApp(QMainWindow):
                 )
                 if result.get("success"):
                     self._mark_sync_done()
+                elif result.get("error"):
+                    self.outlook_unavailable.emit(str(result["error"]))
             except Exception:
                 log.exception("auto_fetch: ошибка сбора писем")
+                try:
+                    self.outlook_unavailable.emit("Ошибка при обращении к Outlook.")
+                except Exception:
+                    pass
             finally:
                 try:
                     self._status_call.emit("Готов")
-                    QTimer.singleShot(0, self._on_init_finished)
                 except Exception:
                     pass
 
         threading.Thread(target=_worker, daemon=True).start()
+        self._on_init_finished()
+
+    def _remember_outlook_warning(self, message):
+        """Запоминаем причину и показываем диалог, когда окно уже на экране."""
+        self._outlook_warning_text = message
+        if getattr(self, "_init_finished", False):
+            QTimer.singleShot(0, self._show_outlook_warning)
+
+    def _show_outlook_warning(self):
+        if self._outlook_warned or not self._outlook_warning_text:
+            return
+        self._outlook_warned = True
+        log.info("Outlook недоступен: показано предупреждение, работа продолжается")
+        try:
+            from PyQt6.QtWidgets import QMessageBox
+
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Information)
+            box.setWindowTitle("Почта недоступна")
+            box.setText("Не удалось загрузить письма из Outlook")
+            box.setInformativeText(
+                f"{self._outlook_warning_text}\n\n"
+                "Программа продолжит работу. Разделы «Дашборд», «Архив» и анализ писем "
+                "будут пустыми — остальные функции доступны."
+            )
+            box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            box.exec()
+        except Exception:
+            log.exception("не удалось показать предупреждение об Outlook")
 
     def _on_init_finished(self):
+        self._init_finished = True
         self._update_splash("Готово", 100)
         try:
             self.ready.emit()
         except Exception:
             pass
+        if self._outlook_warning_text:
+            QTimer.singleShot(400, self._show_outlook_warning)
 
     def _update_splash(self, text, progress, is_loading=False):
         if self._splash is None:

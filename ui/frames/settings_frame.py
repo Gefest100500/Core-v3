@@ -267,6 +267,17 @@ class SettingsFrame(BaseFrame):
         auto_enabled = self._settings.value("auto_log_enabled", "true") == "true"
         if not auto_enabled:
             return
+
+        # Без Outlook отправка невозможна: не пытаемся и не ждём таймаут COM.
+        try:
+            from core.outlook_connector import outlook_installed
+
+            if not outlook_installed():
+                log.info("settings_frame: Outlook не установлен — автоотправка лога пропущена")
+                return
+        except Exception:
+            log.exception("settings_frame: не удалось проверить наличие Outlook")
+            return
             
         last_sent = self._settings.value("last_log_sent", "")
         if should_auto_send(last_sent):
