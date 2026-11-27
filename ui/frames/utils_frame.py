@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 
 from ui.frames.base_frame import BaseFrame
 from ui.icons import get_icon_simple
+from utils.logger import log
 
 class ToolCard(QFrame):
     """Карточка одной утилиты.
@@ -37,7 +38,8 @@ class ToolCard(QFrame):
 
     def __init__(self, tool, colors, parent=None):
         super().__init__(parent)
-        self.tab_name = tool["tab"]
+        self.tab_name = tool.get("tab", "")
+        self.action = tool.get("action", "")
         self.colors = colors
         self.in_development = tool.get("in_development", False)
 
@@ -268,6 +270,12 @@ class UtilsFrame(BaseFrame):
                 "desc": "Генерация QR-кодов для настройки терминалов",
                 "tab": "tsd",
             },
+            {
+                "icon_name": "cloud",
+                "title": "Push Git",
+                "desc": "Отправить файлы в Git-репозиторий",
+                "action": "push_git",
+            },
         ]
 
         for tool in self._tools:
@@ -290,14 +298,29 @@ class UtilsFrame(BaseFrame):
             shortcut = QShortcut(QKeySequence(f"Ctrl+{i}"), self)
             # Замыкаем tab_name через дефолтный аргумент,
             # чтобы не поймать последний tool во всех лямбдах.
+            key = tool.get("action") or tool.get("tab", "")
             shortcut.activated.connect(
-                lambda t=tool["tab"]: self._open_tool(t)
+                lambda t=key: self._open_tool(t)
             )
             self._shortcuts.append(shortcut)
 
     # =========================================================
     # ОТКРЫТИЕ УТИЛИТЫ
     # =========================================================
-    def _open_tool(self, tab_name):
+    def _open_tool(self, name):
+        # Карточки-действия открывают диалог, а не вкладку
+        if name == "push_git":
+            self._open_push_git()
+            return
+
         if hasattr(self.app, "show_tab"):
-            self.app.show_tab(tab_name)
+            self.app.show_tab(name)
+
+    def _open_push_git(self):
+        try:
+            from ui.components.push_git_dialog import PushGitDialog
+            dialog = PushGitDialog(self, self.COLORS)
+            dialog.exec()
+        except Exception as e:
+            log.exception(f"Не удалось открыть Push Git: {e}")
+            self.show_error("Ошибка", f"Не удалось открыть Push Git: {e}")

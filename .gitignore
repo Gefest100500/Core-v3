@@ -115,3 +115,7 @@ dist/
 *.spec.bak
 installer/Output/
 Output/
+
+# Временный репозиторий для переноса файлов
+# (отдельный git-репо, не часть Core)
+tmp-transfer/

@@ -109,6 +109,7 @@ class CustomMessageBox(QDialog):
         self.error_text = message
         self.msg_type = msg_type
         self._buttons = buttons if buttons else ["ОК"]
+        self._choice = -1
         self._colors = {
             "bg": bg, "card": card, "text": text,
             "button": button, "hover": hover,
@@ -246,7 +247,11 @@ class CustomMessageBox(QDialog):
             elif btn_text == "Нет":
                 btn.clicked.connect(self._on_no)
             else:
-                btn.clicked.connect(self._on_ok)
+                # Произвольная кнопка — возвращаем её индекс через self._choice
+                idx = self._buttons.index(btn_text)
+                btn.clicked.connect(
+                    lambda checked=False, i=idx: self._on_choice(i)
+                )
 
             btn_layout.addWidget(btn)
             self._button_widgets.append(btn)
@@ -272,6 +277,14 @@ class CustomMessageBox(QDialog):
             self._on_no()
         else:
             super().keyPressEvent(event)
+
+    def _on_choice(self, index: int):
+        """Выбор произвольной кнопки. exec() вернёт index."""
+        self._choice = index
+        try:
+            self.done(index)
+        except Exception:
+            pass
 
     def _on_ok(self):
         try:
